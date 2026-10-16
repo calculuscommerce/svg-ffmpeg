@@ -29,7 +29,7 @@ mkdirSync(workDir, { recursive: true });
 const log = (o) => process.stdout.write(JSON.stringify(o) + "\n");
 
 // static server (fetch() is blocked on file://)
-const MIME = { ".html": "text/html", ".js": "text/javascript", ".svg": "image/svg+xml", ".ttf": "font/ttf" };
+const MIME = { ".html": "text/html", ".js": "text/javascript", ".svg": "image/svg+xml", ".ttf": "font/ttf", ".json": "application/json", ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg" };
 const server = http.createServer((req, res) => {
   const f = path.join(ROOT, decodeURIComponent(new URL(req.url, "http://x").pathname));
   if (!f.startsWith(ROOT) || !existsSync(f)) { res.writeHead(404); return res.end(); }
@@ -66,7 +66,7 @@ async function newPage() {
 
 async function renderScene(page, sc, i) {
   const D = sc.duration;
-  await page.evaluate(([d, dur]) => window.loadScene(d, dur), [{ svgText: sc.svgText, anim: sc.anim, camera: sc.camera, safeBottom: spec.captions ? 84 : 0 }, D]);
+  await page.evaluate(([d, dur]) => window.loadScene(d, dur), [{ svgText: sc.svgText, anim: sc.anim, camera: sc.camera, safeBottom: spec.captions ? 84 : 0, hand: !!sc.hand, mono: !!sc.mono }, D]);
   if (sc.thumb) {
     await page.evaluate((t) => window.seek(t), Math.min(D * 0.75, D - 0.3));
     await page.screenshot({ path: sc.thumb, type: "png" });
@@ -90,7 +90,7 @@ if (spec.stills) {
   // debug mode: one PNG per scene at the given time, no video
   const page = await newPage();
   for (const [i, sc] of spec.scenes.entries()) {
-    await page.evaluate(([d, dur]) => window.loadScene(d, dur), [{ svgText: sc.svgText, anim: sc.anim, camera: sc.camera }, sc.duration]);
+    await page.evaluate(([d, dur]) => window.loadScene(d, dur), [{ svgText: sc.svgText, anim: sc.anim, camera: sc.camera, hand: !!sc.hand, mono: !!sc.mono }, sc.duration]);
     await page.evaluate((t) => window.seek(t), sc.stillAt ?? sc.duration - 0.3);
     await page.screenshot({ path: sc.thumb, type: "png" });
     log({ event: "still", scene: i, file: sc.thumb });

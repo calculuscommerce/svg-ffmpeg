@@ -123,7 +123,7 @@ async def run(p: dict):
     spec_scenes, offsets, offset = [], [], 0.0
     for i, (sc, (mp3, words, adur)) in enumerate(zip(sb.scenes, voiced)):
         s = compose.compose_scene(sc, T, words, adur, is_last=(i == len(sb.scenes) - 1))
-        s.update({"id": i, "audio": mp3, "thumb": str(pdir / f"thumb_{i}.png")})
+        s.update({"id": i, "audio": mp3, "thumb": str(pdir / f"thumb_{i}.png"), "hand": inp.hand, "mono": bool(T.get("mono"))})
         spec_scenes.append(s)
         offsets.append((offset, words))
         offset += s["duration"]

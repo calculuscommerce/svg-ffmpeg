@@ -19,7 +19,7 @@ def asset_names() -> list[str]:
     txt = (ROOT / "lib" / "parts.svg").read_text()
     names = re.findall(r'<g id="([a-z0-9-]+)"', txt)
     skip = {"icons", "soil-body", "roots", "stem", "sun-rays", "leaf-shape"}
-    return [n for n in names if n not in skip]
+    return [n for n in names if n not in skip and not n.startswith("hand-")]
 
 
 # words/sec for ElevenLabs at normal pace, plus ~1.3 s of lead/tail per scene

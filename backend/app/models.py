@@ -50,3 +50,4 @@ class CreateProject(BaseModel):
     captions: bool = False
     language: str = "English"
     hd: bool = False
+    hand: bool = False  # show a drawing hand that traces strokes and places elements

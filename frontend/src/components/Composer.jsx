@@ -21,6 +21,7 @@ export default function Composer({ voices, themes, onCreate }) {
   const [theme, setTheme] = useState("auto");
   const [captions, setCaptions] = useState(false);
   const [hd, setHd] = useState(false);
+  const [hand, setHand] = useState(false);
   const [language, setLanguage] = useState("English");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -45,7 +46,7 @@ export default function Composer({ voices, themes, onCreate }) {
     if (prompt.trim().length < 3) return;
     setBusy(true); setErr(null);
     try {
-      await onCreate({ prompt, duration, voice_id: voice || null, theme, captions, hd, language });
+      await onCreate({ prompt, duration, voice_id: voice || null, theme, captions, hd, language, hand });
     } catch (e2) {
       setErr(e2.message); setBusy(false);
     }
@@ -115,11 +116,12 @@ export default function Composer({ voices, themes, onCreate }) {
               <button type="button" className={"swatch auto " + (theme === "auto" ? "on" : "")} onClick={() => setTheme("auto")} title="Let the AI pick">Auto</button>
               {themes.map((t) => (
                 <button type="button" key={t.name} className={"swatch " + (theme === t.name ? "on" : "")} onClick={() => setTheme(t.name)} title={t.name}
-                  style={{ background: `linear-gradient(135deg, ${t.primary} 0 50%, ${t.accent} 50% 100%)` }} />
+                  style={{ background: t.mono ? `linear-gradient(135deg, #111 0 50%, #fff 50% 100%)` : `linear-gradient(135deg, ${t.primary} 0 50%, ${t.accent} 50% 100%)`, border: t.mono ? "1px solid #999" : undefined }} />
               ))}
             </div>
           </div>
           <div className="toggles">
+            <label className="toggle"><input type="checkbox" checked={hand} onChange={(e) => setHand(e.target.checked)} /> Drawing hand on screen <span className="muted small">(whiteboard style — pairs well with the black “marker” theme)</span></label>
             <label className="toggle"><input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} /> Burn in captions</label>
             <label className="toggle"><input type="checkbox" checked={hd} onChange={(e) => setHd(e.target.checked)} /> 1080p (slower render)</label>
           </div>

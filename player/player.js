@@ -20,6 +20,131 @@ let cameraMode = null;
 let sceneDur = 10;
 let baseScale = 1; // < 1 leaves a free band at the bottom for burned-in captions
 
+// ---- drawing hand -------------------------------------------------------------------------
+const stage = document.getElementById("stage");
+const handLayer = document.getElementById("hand");
+let handMode = false;
+let handImgs = undefined;         // null = use vector hands; {marker:{...}, pinch:{...}} = photo cutouts
+const HAND_KIND = { draw: "marker", wipe: "marker", scalex: "marker", pop: "pinch", grow: "pinch", slide: "pinch", fade: "pinch" };
+const HAND_PRE = 0.4;             // pinch hand arrives this long before the element appears
+const HAND_GLIDE = 0.45;          // enter / leave travel time
+const HAND_OFF = { x: 1420, y: 980 };
+const lerp = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k });
+
+async function loadHandAssets() {
+  if (handImgs !== undefined) return;
+  try {
+    const r = await fetch("../assets/hands/hands.json");
+    handImgs = r.ok ? await r.json() : null;
+  } catch { handImgs = null; }
+}
+
+async function buildHands() {
+  await loadHandAssets();
+  handLayer.replaceChildren();
+  for (const kind of ["marker", "pinch"]) {
+    const g = document.createElementNS(NS, "g");
+    g.id = "hand-" + kind + "-g";
+    const cfg = handImgs && handImgs[kind];
+    if (cfg) {
+      const img = document.createElementNS(NS, "image");
+      img.setAttribute("href", "../assets/hands/" + cfg.src);
+      const w = cfg.width || 520;
+      // place so the tip pixel lands on the origin; scale from natural width when known
+      const nat = cfg.natural_width || cfg.width || 520;
+      const s = w / nat;
+      img.setAttribute("width", nat); img.setAttribute("height", cfg.natural_height || nat);
+      img.setAttribute("transform", `scale(${s}) translate(${-cfg.tip[0]},${-cfg.tip[1]})`);
+      g.appendChild(img);
+    } else {
+      const src = parts.querySelector("#hand-" + kind);
+      for (const a of src.attributes) if (a.name !== "id") g.setAttribute(a.name, a.value);
+      for (const child of src.children) g.appendChild(document.importNode(child, true));
+      // soft drop shadow so the hand reads as sitting above the board
+      g.style.filter = "drop-shadow(6px 10px 10px rgba(0,0,0,.28))";
+    }
+    g.style.display = "none";
+    handLayer.appendChild(g);
+  }
+}
+
+function toStage(pt, ctm) {
+  const p = stage.createSVGPoint(); p.x = pt.x; p.y = pt.y;
+  return p.matrixTransform(ctm).matrixTransform(stage.getScreenCTM().inverse());
+}
+
+// where the hand should be for anim `a` at time t (stage coordinates)
+function handTarget(a, t) {
+  const q = clamp((t - a.start) / a.dur);
+  const el = a.el;
+  if (a.fx === "draw" && a.geoms.length) {
+    const e = easeInOut(q);
+    const d = e * a.totalLen;
+    let acc = 0;
+    for (const g of a.geoms) {
+      if (d <= acc + g._len || g === a.geoms[a.geoms.length - 1]) {
+        const local = Math.max(0, Math.min(g._len, d - acc));
+        return toStage(g.getPointAtLength(local), g.getScreenCTM());
+      }
+      acc += g._len;
+    }
+  }
+  if (a.fx === "wipe") {
+    const bb = a.bb;
+    return toStage({ x: bb.x + (bb.width + 12) * easeInOut(q), y: bb.y + bb.height * 0.78 }, el.getScreenCTM());
+  }
+  const bb = el.getBBox();
+  if (a.fx === "scalex") {
+    const P = a.p, v = valueAt(P, (t - a.start) / a.dur), m = P.values ? Math.max(...P.values) : Math.max(P.from ?? 0, P.to ?? 1);
+    return toStage({ x: bb.x + bb.width * Math.max(v / m, 0.0001), y: bb.y + bb.height / 2 }, el.parentNode.getScreenCTM());
+  }
+  return toStage({ x: bb.x + bb.width / 2, y: bb.y + bb.height / 2 }, el.parentNode.getScreenCTM());
+}
+
+function updateHand(t) {
+  const cands = anims.filter((a) => HAND_KIND[a.fx]).map((a) => {
+    const kind = HAND_KIND[a.fx];
+    const s = a.start - (kind === "pinch" ? HAND_PRE : 0);
+    return { a, kind, s, e: a.start + a.dur };
+  });
+  let active = null, next = null, prev = null;
+  for (const c of cands) {
+    if (t >= c.s && t <= c.e) { if (!active || c.s > active.s) active = c; }
+    else if (c.s > t) { if (!next || c.s < next.s) next = c; }
+    else if (c.e < t) { if (!prev || c.e > prev.e) prev = c; }
+  }
+  let pos = null, kind = null, pressing = false;
+  if (active) {
+    kind = active.kind;
+    const tt = Math.max(t, active.a.start);
+    pos = handTarget(active.a, tt);
+    pressing = true;
+    if (kind === "pinch" && t < active.a.start) {
+      // flying in with the element
+      const k = easeOut((t - active.s) / HAND_PRE);
+      pos = lerp(HAND_OFF, pos, k);
+    }
+  } else if (next && next.s - t < HAND_GLIDE && !(prev && t - prev.e < HAND_GLIDE && prev.e > next.s - HAND_GLIDE - 0.01 && false)) {
+    kind = next.kind;
+    const target = handTarget(next.a, next.a.start);
+    const k = easeInOut(1 - (next.s - t) / HAND_GLIDE);
+    pos = prev && t - prev.e < HAND_GLIDE ? lerp(handTarget(prev.a, prev.e), target, k) : lerp(HAND_OFF, target, k);
+  } else if (prev && t - prev.e < HAND_GLIDE) {
+    kind = prev.kind;
+    pos = lerp(handTarget(prev.a, prev.e), HAND_OFF, easeInOut((t - prev.e) / HAND_GLIDE));
+  }
+  if (!pos) { handLayer.style.display = "none"; return; }
+  handLayer.style.display = "";
+  for (const k of ["marker", "pinch"]) {
+    const g = document.getElementById("hand-" + k + "-g");
+    if (g) g.style.display = k === kind ? "" : "none";
+  }
+  const wob = Math.sin(t * 2.3) * 2.5;
+  const rot = (kind === "marker" ? -6 : 2) + wob;
+  const lift = pressing ? 0 : -14;
+  handLayer.setAttribute("transform", `translate(${pos.x.toFixed(1)},${(pos.y + lift).toFixed(1)}) rotate(${rot.toFixed(2)})`);
+}
+
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const easeOut = (p) => 1 - Math.pow(1 - p, 3);
 const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
@@ -99,6 +224,9 @@ window.loadScene = async function (def, D) {
   sceneDur = D;
   cameraMode = def.camera || null;
   baseScale = def.safeBottom ? (720 - def.safeBottom) / 720 : 1;
+  handMode = !!def.hand;
+  scene.style.filter = def.mono ? "url(#wobble) grayscale(1) contrast(1.08)" : "url(#wobble)";
+  if (handMode) await buildHands(); else handLayer.style.display = "none";
   const svg = def.svgText ? parse(`<svg xmlns="${NS}">${def.svgText}</svg>`) : await fetchSvg("../" + def.svg);
   if (svg.nodeName === "parsererror" || svg.querySelector("parsererror")) throw new Error("scene SVG parse error: " + svg.textContent.slice(0, 200));
 
@@ -133,6 +261,7 @@ window.loadScene = async function (def, D) {
         c.geoms = [...(el.matches("path,line,polyline,polygon,circle,ellipse,rect") ? [el] : []), ...el.querySelectorAll("path,line,polyline,polygon,circle,ellipse,rect")]
           .filter((g) => typeof g.getTotalLength === "function");
         c.geoms.forEach((g) => { g._len = g.getTotalLength() || 1; g._hasFill = g.getAttribute("fill") && g.getAttribute("fill") !== "none"; });
+        c.totalLen = c.geoms.reduce((s, g) => s + g._len, 0) || 1;
       }
       if (a.fx === "wipe") {
         const bb = el.getBBox();
@@ -175,11 +304,15 @@ window.seek = function (t) {
       case "slide": { const e = easeOut(q); s.tx += (P.dx || 0) * (1 - e); s.ty += (P.dy || 0) * (1 - e); s.op *= e; break; }
       case "draw": {
         const e = easeInOut(q);
+        let acc = 0;
         for (const g of a.geoms) {
           if (q >= 1) { g.style.strokeDasharray = ""; g.style.strokeDashoffset = ""; g.style.fillOpacity = ""; continue; }
+          // hand mode draws strokes one after another so the pen tip is well defined; otherwise all at once
+          const gq = handMode ? clamp((e * a.totalLen - acc) / g._len) : e;
+          acc += g._len;
           g.style.strokeDasharray = g._len;
-          g.style.strokeDashoffset = g._len * (1 - e);
-          if (g._hasFill) g.style.fillOpacity = clamp((q - 0.5) / 0.5);
+          g.style.strokeDashoffset = g._len * (1 - gq);
+          if (g._hasFill) g.style.fillOpacity = handMode ? clamp((gq - 0.6) / 0.4) : clamp((q - 0.5) / 0.5);
         }
         s.op *= p > 0 ? 1 : 0;
         break;
@@ -197,4 +330,5 @@ window.seek = function (t) {
     el.style.opacity = s.op;
     el.style.transform = `translate(${s.tx}px,${s.ty}px) rotate(${s.rot}deg) scale(${s.sx},${s.sy})`;
   }
+  if (handMode) updateHand(t);
 };

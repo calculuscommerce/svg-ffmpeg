@@ -48,6 +48,15 @@ src/build.mjs    legacy CLI: hand-written storyboards/*.json -> MP4 using macOS 
 - Text auto-shrinks to fit (`data-maxw`), parts auto-scale into their box (`data-fit`).
 - Word budgets per duration are enforced by the lint pass (the LLM is asked to trim if over).
 
+## Drawing-hand mode (VideoScribe / RSA-Animate look)
+
+Tick **Drawing hand on screen** (API: `"hand": true`) and, ideally, pick the black **marker** theme.
+The player then draws strokes one after another with a marker hand following the pen tip
+(`path.getPointAtLength`), writes text behind the marker, and carries popped-in elements onto the board with a
+pinching hand. The hands are vector placeholders in `lib/parts.svg` (`hand-marker`, `hand-pinch`); to use photo
+cutouts, drop PNGs into `assets/hands/` and describe the tip pixel in `assets/hands/hands.json` (see the README there).
+The marker theme sets `mono`, which desaturates the whole scene so library icons read as ink drawings.
+
 ## Gotchas
 
 - Animated elements must not carry a `transform=""` attribute (CSS transform overrides it) — wrap them in a positioned `<g>`.
