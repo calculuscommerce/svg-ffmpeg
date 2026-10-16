@@ -79,7 +79,7 @@ STYLES = {
     "hand-vector": "Clean monoline vector icon illustration: single-weight dark navy outlines, minimal muted fills (navy, slate blue, white), geometric, lots of white space, modern infographic style.",
     "bold-marker": "Bold thick marker illustration: heavy black outlines, saturated poster colours (red, yellow, blue, green), chunky shapes, energetic, highlighter-style accents.",
     "chalkboard": "Chalk drawing on a dark green chalkboard: white and pastel chalk strokes (cream, soft yellow, mint), slightly dusty and grainy, textured chalk shading, classroom feel.",
-    "editorial-monochrome": "Fine editorial pencil-and-ink illustration: delicate crosshatching, soft greys, cream paper tones, elegant and understated like a quality magazine or vintage encyclopedia plate.",
+    "editorial-monochrome": "Highly detailed realistic graphite pencil and fine-liner illustration in the style of a premium newspaper or magazine editorial: realistic people with natural proportions, expressive faces and hands, dense fine crosshatching and tonal shading, rich greys with no colour at all, drawn on plain warm cream paper. The figures and objects fade softly into the paper towards the bottom edge, like an unfinished vignette. Any device screens or signs in the picture may show short, clean, legible labels where natural.",
     "voxel-arcade": "16-bit pixel art sprite: chunky visible pixels, crisp edges, limited palette (cobalt blue, yellow, orange, mint, white), retro arcade game style.",
     "retro-mint": "Mid-century retro illustration: mint green, mustard yellow, burnt orange and dark teal, flat textured shapes, slight print grain, label-box poster style from the 1950s.",
     "documentary-blueprint": "Technical blueprint drawing: thin white and pale blue line work, dashed construction lines and dimension marks, drafting style on deep blueprint blue.",
@@ -91,6 +91,17 @@ STYLES = {
 }
 for _n in ("ocean", "forest", "sunset", "berry", "slate"):
     STYLES[_n] = STYLES["hand-drawn"]
+
+# Per-theme image generation options: opaque paper (feathered into the theme bg) vs transparent cutout; quality tier;
+# whether short text on screens/signs is allowed in the picture.
+IMAGE_OPTS = {
+    "editorial-monochrome": dict(background="opaque", paper="#f7f4ee", quality="high", screen_text=True, feather=True),
+    "pencil": dict(background="opaque", paper="#fafafa", quality="medium", screen_text=False, feather=True),
+}
+DEFAULT_IMAGE_OPTS = dict(background="transparent", paper=None, quality=None, screen_text=False, feather=False)
+
+for _n, _o in IMAGE_OPTS.items():
+    THEMES[_n]["feather"] = bool(_o.get("feather"))
 
 GALLERY = ["hand-drawn", "hand-vector", "bold-marker", "chalkboard", "editorial-monochrome", "voxel-arcade",
            "retro-mint", "documentary-blueprint", "neon", "doodle-color-pop", "notebook", "pencil", "marker"]

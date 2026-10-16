@@ -513,10 +513,21 @@ def t_outro(s: Scene, T) -> tuple[str, list[dict]]:
 
 # ---------------------------------------------------------------- illustrated layouts (image-model art + vector text)
 
-def illus(x, y, w, h, url, *, id="illus") -> str:
-    """Place the illustration (1536x1024 PNG) centred in a box, preserving aspect."""
-    return (f'<image id="{id}" href="{esc(url)}" x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{h:.0f}" '
-            f'preserveAspectRatio="xMidYMid meet"/>')
+def illus(x, y, w, h, url, *, id="illus", feather=False) -> str:
+    """Place the illustration (1536x1024 PNG) centred in a box, preserving aspect.
+    feather=True: the image is multiply-blended (paper whites disappear into the theme background) and its edges are
+    softened with a blurred mask so an opaque paper image melts into the page."""
+    img = (f'<image href="{esc(url)}" x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{h:.0f}" '
+           f'preserveAspectRatio="xMidYMid meet"{" style=\"mix-blend-mode:multiply;filter:brightness(1.06) contrast(1.04)\"" if feather else ""}/>')
+    if not feather:
+        return img.replace("<image ", f'<image id="{id}" ', 1)
+    mid = f"m{id}"
+    inset, blur = 58, 34
+    return (f'<g id="{id}"><defs>'
+            f'<filter id="{mid}f" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="{blur}"/></filter>'
+            f'<mask id="{mid}" maskUnits="userSpaceOnUse" x="{x - 60:.0f}" y="{y - 60:.0f}" width="{w + 120:.0f}" height="{h + 120:.0f}">'
+            f'<rect x="{x + inset:.0f}" y="{y + inset:.0f}" width="{w - 2 * inset:.0f}" height="{h - 2 * inset:.0f}" rx="40" fill="#fff" filter="url(#{mid}f)"/>'
+            f'</mask></defs><g mask="url(#{mid})">{img}</g></g>')
 
 
 def i_title(s: Scene, T, url) -> tuple[str, list[dict]]:
@@ -532,9 +543,10 @@ def i_title(s: Scene, T, url) -> tuple[str, list[dict]]:
     if s.subheading:
         p.append(multiline(70, uy + 66, wrap(s.subheading, 40, 600, 3), 40, T["ink"], id="sub"))
         a.append({"sel": "#sub", "fx": "wipe", "dur": 1.2, "rel": 0.5})
-    p.append(illus(690, 110, 540, 520, url))
-    a.append({"sel": "#illus", "fx": "pop", "dur": 0.9, "rel": 0.3})
-    a.append({"sel": "#illus", "fx": "bob", "dy": 6, "period": 3.2, "rel": 0.9})
+    p.append(illus(670, 60, 600, 620, url, feather=T.get("feather", False)))
+    a.append({"sel": "#illus", "fx": "fade" if T.get("feather") else "pop", "dur": 0.9, "rel": 0.3})
+    if not T.get("feather"):
+        a.append({"sel": "#illus", "fx": "bob", "dy": 6, "period": 3.2, "rel": 0.9})
     return "".join(p), _clean(a)
 
 
@@ -556,8 +568,8 @@ def i_outro(s: Scene, T, url) -> tuple[str, list[dict]]:
         g.append(text(150 if it.icon else 100, y + 12, it.label or "", 32, T["ink"], maxw=480))
         p.append(f'<g id="rp{i}">{"".join(g)}</g>')
         a.append({"sel": f"#rp{i}", "fx": "pop", "dur": 0.55, "cue": cue(it)})
-    p.append(illus(690, 110, 540, 520, url))
-    a.insert(2, {"sel": "#illus", "fx": "pop", "dur": 0.9, "rel": 0.3})
+    p.append(illus(670, 60, 600, 620, url, feather=T.get("feather", False)))
+    a.insert(2, {"sel": "#illus", "fx": "fade" if T.get("feather") else "pop", "dur": 0.9, "rel": 0.3})
     return "".join(p), _clean(a)
 
 
@@ -567,8 +579,8 @@ def i_points(s: Scene, T, url) -> tuple[str, list[dict]]:
     items = [it for it in s.items if it.label or it.caption or it.value][:5]
     if s.type == "concept":
         items = [it for it in items if it is not (s.items[0] if s.items else None)] or items
-    p.append(illus(50, 180, 560, 500, url))
-    a.append({"sel": "#illus", "fx": "pop", "dur": 0.9, "rel": 0.4})
+    p.append(illus(30, 150, 610, 560, url, feather=T.get("feather", False)))
+    a.append({"sel": "#illus", "fx": "fade" if T.get("feather") else "pop", "dur": 0.9, "rel": 0.4})
     n = len(items)
     if n:
         row = min(104, 470 / n)

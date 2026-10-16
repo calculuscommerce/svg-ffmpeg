@@ -52,7 +52,9 @@ Scene = {
 Every scene gets an `illustration`: 1-2 sentences describing ONE clear picture that shows the idea of that scene —
 concrete objects, people doing things, visual metaphors. Say what to draw and how it is arranged; never mention style,
 colours or text (the style is fixed by the theme and text is rendered separately). No words, numbers, labels or signs
-in the picture. Keep it to a single subject or a small group so it reads at a glance. Example: "A person holding an
+floating in the picture (short text shown on a device screen or sign is acceptable when it is part of the scene).
+Prefer people doing something concrete over abstract objects when the idea involves people. Keep it to a single
+subject or a small group so it reads at a glance. Example: "A person holding an
 empty wallet looks at a shop window with a shiny red scooter inside". For bars/stat/flow/compare/diagram scenes the
 brief is a supporting image (the numbers/structure are drawn separately).
 
