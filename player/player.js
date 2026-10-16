@@ -25,8 +25,8 @@ const stage = document.getElementById("stage");
 const handLayer = document.getElementById("hand");
 let handMode = false;
 let handImgs = undefined;         // null = use vector hands; {marker:{...}, pinch:{...}} = photo cutouts
-const HAND_KIND = { draw: "marker", wipe: "marker", scalex: "marker", pop: "pinch", grow: "pinch", slide: "pinch", fade: "pinch" };
-const HAND_PRE = 0.4;             // pinch hand arrives this long before the element appears
+const HAND_KIND = { draw: "marker", wipe: "marker", scalex: "marker", sketch: "marker" };
+const HAND_PRE = 0;               // the marker never needs a pre-roll
 const HAND_GLIDE = 0.45;          // enter / leave travel time
 const HAND_OFF = { x: 1420, y: 980 };
 const lerp = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k });
@@ -42,7 +42,7 @@ async function loadHandAssets() {
 async function buildHands() {
   await loadHandAssets();
   handLayer.replaceChildren();
-  for (const kind of ["marker", "pinch"]) {
+  for (const kind of ["marker"]) {
     const g = document.createElementNS(NS, "g");
     g.id = "hand-" + kind + "-g";
     const cfg = handImgs && handImgs[kind];
@@ -91,8 +91,16 @@ function handTarget(a, t) {
     }
   }
   if (a.fx === "wipe") {
-    const bb = a.bb;
-    return toStage({ x: bb.x + (bb.width + 12) * easeInOut(q), y: bb.y + bb.height * 0.78 }, el.getScreenCTM());
+    const e = easeInOut(q), n = a.lines.length;
+    const i = Math.min(n - 1, Math.floor(e * n)), f = clamp(e * n - i);
+    const L = a.lines[i];
+    return toStage({ x: L.x - 2 + (L.width + 8) * f, y: L.y + L.height * 0.8 }, el.getScreenCTM());
+  }
+  if (a.fx === "sketch") {
+    const e = easeInOut(q), bb = a.bb;
+    const passes = Math.max(3, Math.min(12, Math.round(bb.height / 36)));
+    const zig = 0.5 + 0.5 * Math.sin(e * passes * Math.PI - Math.PI / 2);
+    return toStage({ x: bb.x + bb.width * zig, y: bb.y + bb.height * e }, el.getScreenCTM());
   }
   const bb = el.getBBox();
   if (a.fx === "scalex") {
@@ -136,10 +144,7 @@ function updateHand(t) {
   }
   if (!pos) { handLayer.style.display = "none"; return; }
   handLayer.style.display = "";
-  for (const k of ["marker", "pinch"]) {
-    const g = document.getElementById("hand-" + k + "-g");
-    if (g) g.style.display = k === kind ? "" : "none";
-  }
+  document.getElementById("hand-marker-g").style.display = "";
   const wob = Math.sin(t * 2.3) * 2.5;
   const rot = (kind === "marker" ? -6 : 2) + wob;
   const lift = pressing ? 0 : -14;
@@ -251,7 +256,8 @@ window.loadScene = async function (def, D) {
     if (!els.length) { console.warn("no match for", a.sel); continue; }
     els.forEach((el, i) => {
       const start = resolveTime(a.t ?? 0, D) + i * (a.stagger || 0);
-      const c = { el, fx: a.fx, start, dur: a.dur ?? 0.6, p: a };
+      const fx = handMode && ["pop", "grow", "slide", "fade"].includes(a.fx) ? "sketch" : a.fx;
+      const c = { el, fx, start, dur: a.dur ?? 0.6, p: a };
       anims.push(c);
       if (!touched.includes(el)) {
         touched.push(el);
@@ -264,14 +270,33 @@ window.loadScene = async function (def, D) {
         c.geoms.forEach((g) => { g._len = g.getTotalLength() || 1; g._hasFill = g.getAttribute("fill") && g.getAttribute("fill") !== "none"; });
         c.totalLen = c.geoms.reduce((s, g) => s + g._len, 0) || 1;
       }
-      if (a.fx === "wipe") {
+      if (fx === "wipe") {
+        // one clip rect per text line so the reveal (and the hand) runs line by line
+        const bb = el.getBBox();
+        const spans = el.tagName === "text" ? [...el.querySelectorAll("tspan")].filter((t) => t.hasAttribute("x")) : [];
+        const lines = (spans.length > 1 ? spans : [el]).map((n) => { const b = n.getBBox(); return { x: b.x, y: b.y, width: b.width, height: b.height }; });
+        const id = "clip" + anims.length;
+        const cp = document.createElementNS(NS, "clipPath");
+        cp.setAttribute("id", id);
+        c.clipRects = lines.map((L) => {
+          const r = document.createElementNS(NS, "rect");
+          r.setAttribute("x", L.x - 6); r.setAttribute("y", L.y - 6);
+          r.setAttribute("height", L.height + 12); r.setAttribute("width", 0);
+          cp.appendChild(r);
+          return r;
+        });
+        defsHost.appendChild(cp);
+        c.lines = lines; c.bb = bb;
+        el.setAttribute("clip-path", `url(#${id})`);
+      }
+      if (fx === "sketch") {
         const bb = el.getBBox();
         const id = "clip" + anims.length;
         const cp = document.createElementNS(NS, "clipPath");
         cp.setAttribute("id", id);
         const r = document.createElementNS(NS, "rect");
-        r.setAttribute("x", bb.x - 6); r.setAttribute("y", bb.y - 10);
-        r.setAttribute("height", bb.height + 20); r.setAttribute("width", 0);
+        r.setAttribute("x", bb.x - 8); r.setAttribute("y", bb.y - 8);
+        r.setAttribute("width", bb.width + 16); r.setAttribute("height", 0);
         cp.appendChild(r);
         defsHost.appendChild(cp);
         c.clipRect = r; c.bb = bb;
@@ -318,7 +343,12 @@ window.seek = function (t) {
         s.op *= p > 0 ? 1 : 0;
         break;
       }
-      case "wipe": a.clipRect.setAttribute("width", (a.bb.width + 12) * easeInOut(q)); break;
+      case "wipe": {
+        const e = easeInOut(q), n = a.lines.length;
+        a.clipRects.forEach((r, i) => r.setAttribute("width", (a.lines[i].width + 12) * clamp(e * n - i)));
+        break;
+      }
+      case "sketch": a.clipRect.setAttribute("height", (a.bb.height + 16) * easeInOut(q)); s.op *= p > 0 ? 1 : 0; break;
       case "count": a.el.textContent = fmtNum(valueAt(P, p), P); s.op *= p >= 0 ? 1 : 0; break;
       case "scalex": { const v = valueAt(P, p), m = P.values ? Math.max(...P.values) : Math.max(P.from ?? 0, P.to ?? 1); s.sx *= Math.max(v / m, 0.0001); s.op *= p > 0 ? 1 : 0; break; }
       case "bob": if (t >= a.start) { const ph = Math.sin(((t - a.start) / (P.period || 2)) * 2 * Math.PI); s.tx += (P.dx || 0) * ph; s.ty += (P.dy || 6) * ph; } break;
