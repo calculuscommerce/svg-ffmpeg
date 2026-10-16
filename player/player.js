@@ -312,6 +312,13 @@ window.loadScene = async function (def, D) {
     });
   }
   await document.fonts.ready;
+  await Promise.all([...scene.querySelectorAll("image")].map((im) => new Promise((res) => {
+    const href = im.getAttribute("href");
+    if (!href) return res();
+    const probe = new Image();
+    probe.onload = probe.onerror = () => res();
+    probe.src = href;
+  })));
   applyFits(scene);
   fitTexts(scene);
 

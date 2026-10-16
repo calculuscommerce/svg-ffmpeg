@@ -73,6 +73,25 @@ THEMES = {t["name"]: t for t in [
        accent="#111111", good="#222222", bad="#111111", ink="#111111", muted="#555555", soft="#f3f3f3", bg="#ffffff", mono=True),
 ]}
 
+# Locked art-direction prompt per theme for the image model. Subject brief is appended; "no text" is enforced globally.
+STYLES = {
+    "hand-drawn": "Hand-drawn whiteboard explainer illustration: bold black marker outlines, flat bright colour fills (blue, yellow, green, coral), slight hand-drawn wobble, small doodle accents like stars and squiggles, playful and clean.",
+    "hand-vector": "Clean monoline vector icon illustration: single-weight dark navy outlines, minimal muted fills (navy, slate blue, white), geometric, lots of white space, modern infographic style.",
+    "bold-marker": "Bold thick marker illustration: heavy black outlines, saturated poster colours (red, yellow, blue, green), chunky shapes, energetic, highlighter-style accents.",
+    "chalkboard": "Chalk drawing on a dark green chalkboard: white and pastel chalk strokes (cream, soft yellow, mint), slightly dusty and grainy, textured chalk shading, classroom feel.",
+    "editorial-monochrome": "Fine editorial pencil-and-ink illustration: delicate crosshatching, soft greys, cream paper tones, elegant and understated like a quality magazine or vintage encyclopedia plate.",
+    "voxel-arcade": "16-bit pixel art sprite: chunky visible pixels, crisp edges, limited palette (cobalt blue, yellow, orange, mint, white), retro arcade game style.",
+    "retro-mint": "Mid-century retro illustration: mint green, mustard yellow, burnt orange and dark teal, flat textured shapes, slight print grain, label-box poster style from the 1950s.",
+    "documentary-blueprint": "Technical blueprint drawing: thin white and pale blue line work, dashed construction lines and dimension marks, drafting style on deep blueprint blue.",
+    "neon": "Neon sign illustration: glowing tube-light strokes in electric green, cyan and magenta on black, soft outer glow, minimal filled shapes.",
+    "doodle-color-pop": "Playful colourful doodle illustration: loose hand-drawn lines, bright pop colours (pink, yellow, cyan, orange), motion lines, sparkles and stars, fun and energetic.",
+    "notebook": "Ballpoint pen and coloured pencil sketch on ruled notebook paper: blue ink lines, light pencil shading, sticky-note yellow and red pencil accents, casual student notebook feel.",
+    "pencil": "Soft graphite pencil sketch: grey tones only, gentle shading and hatching, visible pencil texture, no colour, sketchbook style.",
+    "marker": "Black whiteboard marker drawing: pure black ink strokes on white, no colour, confident hand-drawn lines, light grey hatching for shadows.",
+}
+for _n in ("ocean", "forest", "sunset", "berry", "slate"):
+    STYLES[_n] = STYLES["hand-drawn"]
+
 GALLERY = ["hand-drawn", "hand-vector", "bold-marker", "chalkboard", "editorial-monochrome", "voxel-arcade",
            "retro-mint", "documentary-blueprint", "neon", "doodle-color-pop", "notebook", "pencil", "marker"]
 DEFAULT_THEME = "hand-drawn"
@@ -90,7 +109,7 @@ def player_theme(T: dict) -> dict:
 
 # One fixed demo scene rendered in every theme for the gallery thumbnails.
 DEMO_SCENE = Scene(
-    type="steps", narration="You start with an idea, turn it into a script, and it becomes a video you can share.",
+    type="steps", illustration="A glowing lightbulb, an open notebook with a pencil, and a video player screen with a play button, arranged left to right and connected by chunky arrows", narration="You start with an idea, turn it into a script, and it becomes a video you can share.",
     heading="How ideas become videos",
     items=[Item(icon="lightbulb", label="Idea", caption="Spark it", cue="idea"),
            Item(icon="document", label="Script", caption="Write it down", cue="script"),

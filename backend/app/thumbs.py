@@ -5,7 +5,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from . import compose
+from . import compose, images
 from .themes import DEMO_SCENE, GALLERY, THEMES, player_theme
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,9 +28,10 @@ async def ensure_thumbs(force: bool = False) -> None:
             return
         words = [(w, i * 0.3, i * 0.3 + 0.25) for i, w in enumerate(DEMO_SCENE.narration.split())]
         scenes = []
-        for n in missing:
+        arts = await asyncio.gather(*(images.generate(n, DEMO_SCENE.illustration, OUT / f"{n}-art.png") for n in missing))
+        for n, art in zip(missing, arts):
             T = THEMES[n]
-            s = compose.compose_scene(DEMO_SCENE, T, words, len(words) * 0.3)
+            s = compose.compose_scene(DEMO_SCENE, T, words, len(words) * 0.3, image_url=f"/data/themes/{n}-art.png" if art else None)
             s.update({"id": len(scenes), "thumb": str(thumb_path(n)), "theme": player_theme(T), "stillAt": s["duration"] - 0.2})
             scenes.append(s)
         spec = OUT / "spec.json"

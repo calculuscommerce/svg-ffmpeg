@@ -10,8 +10,9 @@ import time
 import uuid
 from pathlib import Path
 
-from . import compose, llm, tts
+from . import compose, images, llm, tts
 from .models import CreateProject, Storyboard
+from .templates import ILLUSTRATED
 from .themes import player_theme, theme as get_theme
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -115,14 +116,27 @@ async def run(p: dict):
             _update(p, progress=14 + int(22 * done / len(sb.scenes)), message=f"Voice-over {done}/{len(sb.scenes)}")
             return str(mp3), words, _probe(str(mp3))
 
-    voiced = await asyncio.gather(*(voice_one(i, sc) for i, sc in enumerate(sb.scenes)))
+    async def illustrate(i, sc):
+        if inp.visuals != "illustrated" or not sc.illustration or sc.type not in ILLUSTRATED:
+            return None  # data-only layouts (bars, stat, flow, compare, diagram) don't place art; skip the cost
+        out = await images.generate(sb.theme, sc.illustration, pdir / f"illus_{i}.png")
+        if out:
+            p["log"].append({"t": time.time(), "m": f"Illustration {i + 1} ready"})
+        return f"/data/projects/{p['id']}/illus_{i}.png" if out else None
+
+    if inp.visuals == "illustrated":
+        _update(p, message="Generating the voice-over and illustrations…")
+    voiced, illus_urls = await asyncio.gather(
+        asyncio.gather(*(voice_one(i, sc) for i, sc in enumerate(sb.scenes))),
+        asyncio.gather(*(illustrate(i, sc) for i, sc in enumerate(sb.scenes))),
+    )
 
     # 3. compose
     _update(p, status="composing", progress=38, message="Laying out scenes and syncing animation…")
     T = get_theme(sb.theme)
     spec_scenes, offsets, offset = [], [], 0.0
     for i, (sc, (mp3, words, adur)) in enumerate(zip(sb.scenes, voiced)):
-        s = compose.compose_scene(sc, T, words, adur, is_last=(i == len(sb.scenes) - 1), hand=inp.hand)
+        s = compose.compose_scene(sc, T, words, adur, is_last=(i == len(sb.scenes) - 1), hand=inp.hand, image_url=illus_urls[i])
         s.update({"id": i, "audio": mp3, "thumb": str(pdir / f"thumb_{i}.png"), "hand": inp.hand and T.get("hand") != "none", "mono": bool(T.get("mono"))})
         spec_scenes.append(s)
         offsets.append((offset, words))

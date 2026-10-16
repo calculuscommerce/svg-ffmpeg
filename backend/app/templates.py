@@ -511,14 +511,111 @@ def t_outro(s: Scene, T) -> tuple[str, list[dict]]:
     return "".join(p), _clean(a)
 
 
+# ---------------------------------------------------------------- illustrated layouts (image-model art + vector text)
+
+def illus(x, y, w, h, url, *, id="illus") -> str:
+    """Place the illustration (1536x1024 PNG) centred in a box, preserving aspect."""
+    return (f'<image id="{id}" href="{esc(url)}" x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{h:.0f}" '
+            f'preserveAspectRatio="xMidYMid meet"/>')
+
+
+def i_title(s: Scene, T, url) -> tuple[str, list[dict]]:
+    p, a = [], []
+    lines = wrap(hd_text(s.heading, T), 84, 600, 3)
+    y0 = 300 - (len(lines) - 1) * 46
+    p.append(multiline(70, y0, lines, 84, T["primary"], id="hd", lh=1.1, bold=True))
+    a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
+    uy = y0 + (len(lines) - 1) * 92 + 44
+    ux2 = 70 + min(600, 40 * max(len(l) for l in lines) if lines else 400)
+    p.append(f'<path id="ul" d="M70,{uy} C170,{uy - 8} {ux2 - 120},{uy + 10} {ux2},{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="8" stroke-linecap="round"/>')
+    a.append({"sel": "#ul", "fx": "draw", "dur": 0.7, "rel": 1.0})
+    if s.subheading:
+        p.append(multiline(70, uy + 66, wrap(s.subheading, 40, 600, 3), 40, T["ink"], id="sub"))
+        a.append({"sel": "#sub", "fx": "wipe", "dur": 1.2, "rel": 0.5})
+    p.append(illus(690, 110, 540, 520, url))
+    a.append({"sel": "#illus", "fx": "pop", "dur": 0.9, "rel": 0.3})
+    a.append({"sel": "#illus", "fx": "bob", "dy": 6, "period": 3.2, "rel": 0.9})
+    return "".join(p), _clean(a)
+
+
+def i_outro(s: Scene, T, url) -> tuple[str, list[dict]]:
+    p, a = [], []
+    lines = wrap(hd_text(s.heading, T), 68, 600, 3)
+    y0 = 240 - (len(lines) - 1) * 38
+    p.append(multiline(70, y0, lines, 68, T["primary"], id="hd", lh=1.12, bold=True))
+    a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
+    uy = y0 + (len(lines) - 1) * 76 + 40
+    p.append(f'<path id="ul" d="M70,{uy} C170,{uy - 8} 520,{uy + 10} 640,{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="8" stroke-linecap="round"/>')
+    a.append({"sel": "#ul", "fx": "draw", "dur": 0.7, "rel": 1.0})
+    for i, it in enumerate(s.items[:3]):
+        y = uy + 70 + i * 86
+        col = palette(T)[i % 5]
+        g = [f'<rect x="70" y="{y - 32}" width="580" height="64" rx="32" fill="{T["card"]}" stroke="{col}" stroke-width="4"/>']
+        if it.icon:
+            g.append(icon(112, y, it.icon, 42, col))
+        g.append(text(150 if it.icon else 100, y + 12, it.label or "", 32, T["ink"], maxw=480))
+        p.append(f'<g id="rp{i}">{"".join(g)}</g>')
+        a.append({"sel": f"#rp{i}", "fx": "pop", "dur": 0.55, "cue": cue(it)})
+    p.append(illus(690, 110, 540, 520, url))
+    a.insert(2, {"sel": "#illus", "fx": "pop", "dur": 0.9, "rel": 0.3})
+    return "".join(p), _clean(a)
+
+
+def i_points(s: Scene, T, url) -> tuple[str, list[dict]]:
+    """Illustration left, heading on top, items as a labelled list on the right (concept/cards/steps/list/callout)."""
+    p, a = heading(s, T)
+    items = [it for it in s.items if it.label or it.caption or it.value][:5]
+    if s.type == "concept":
+        items = [it for it in items if it is not (s.items[0] if s.items else None)] or items
+    p.append(illus(50, 180, 560, 500, url))
+    a.append({"sel": "#illus", "fx": "pop", "dur": 0.9, "rel": 0.4})
+    n = len(items)
+    if n:
+        row = min(104, 470 / n)
+        y0 = 215 + (470 - row * n) / 2 + 20
+        for i, it in enumerate(items):
+            y = y0 + i * row
+            col = palette(T)[i % 5]
+            g = []
+            if s.type in ("steps",):
+                g.append(f'<circle cx="676" cy="{y - 10}" r="22" fill="{col}" stroke="{T["ink"]}" stroke-width="3"/>'
+                         + text(676, y - 1, str(i + 1), 26, T["bg"] if T.get("dark") else "#ffffff", anchor="middle", bold=True))
+            elif it.icon:
+                g.append(icon(676, y - 10, it.icon, 44, col))
+            else:
+                g.append(f'<circle cx="676" cy="{y - 10}" r="9" fill="{col}"/>')
+            lab = it.label or ""
+            if it.value:
+                lab = f"{lab}  {it.value}" if lab else it.value
+            g.append(text(720, y, lab, 36, T["ink"], maxw=500, bold=bool(it.value or n <= 3)))
+            if it.caption and row >= 70:
+                g.append(text(720, y + 32, it.caption, 24, T["muted"], maxw=500))
+            p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+            a.append({"sel": f"#pt{i}", "fx": "slide", "dx": 40, "dur": 0.6, "cue": cue(it)})
+    return "".join(p), _clean(a)
+
+
+def i_side(s: Scene, T, url, inner) -> tuple[str, list[dict]]:
+    """Keep a data template (bars/stat/compare/flow/diagram) but tuck a smaller illustration into free space."""
+    svg, anims = inner(s, T)
+    if s.type in ("bars", "stat"):
+        return svg, anims  # these use the full width; no room for art
+    return svg, anims
+
+
+ILLUSTRATED = {"title": i_title, "outro": i_outro, "concept": i_points, "cards": i_points, "steps": i_points,
+               "list": i_points, "callout": i_points}
+
 TEMPLATES = {
     "title": t_title, "concept": t_concept, "cards": t_cards, "bars": t_bars, "steps": t_steps, "list": t_list,
     "stat": t_stat, "flow": t_flow, "compare": t_compare, "callout": t_callout, "diagram": t_diagram, "outro": t_outro,
 }
 
 
-def render_scene(scene: Scene, T: dict) -> tuple[str, list[dict]]:
+def render_scene(scene: Scene, T: dict, image_url: str | None = None) -> tuple[str, list[dict]]:
     set_font_metrics(T)
+    if image_url and scene.type in ILLUSTRATED:
+        return ILLUSTRATED[scene.type](scene, T, image_url)
     fn = TEMPLATES.get(scene.type, t_list)
     return fn(scene, T)
 

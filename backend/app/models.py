@@ -34,6 +34,7 @@ class Scene(BaseModel):
     items: list[Item] = []
     connections: list[Connection] = []
     svg: Optional[str] = None  # diagram scenes only: inline SVG fragment
+    illustration: Optional[str] = None  # brief for the image model (illustrated mode)
 
 
 class Storyboard(BaseModel):
@@ -53,6 +54,7 @@ class CreateProject(BaseModel):
     language: str = "English"
     hd: bool = False
     hand: bool = False  # show a drawing hand that traces strokes and places elements
+    visuals: Literal["illustrated", "diagram"] = "illustrated"  # illustrated = image-model art per scene
 
     def text_for_title(self) -> str:
         return (self.script or self.prompt or "").strip()

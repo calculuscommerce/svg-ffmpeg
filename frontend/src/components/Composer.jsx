@@ -27,6 +27,7 @@ export default function Composer({ voices, themes, onCreate }) {
   const [captions, setCaptions] = useState(false);
   const [hd, setHd] = useState(false);
   const [hand, setHand] = useState(false);
+  const [visuals, setVisuals] = useState("illustrated");
   const [showThemes, setShowThemes] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
@@ -41,7 +42,7 @@ export default function Composer({ voices, themes, onCreate }) {
     if (!ready) return;
     setBusy(true); setErr(null);
     try {
-      await onCreate({ mode, prompt, script: mode === "script" ? script : null, duration, voice_id: voice || null, theme, captions, hd, language, hand });
+      await onCreate({ mode, prompt, script: mode === "script" ? script : null, duration, voice_id: voice || null, theme, captions, hd, language, hand, visuals });
     } catch (e2) { setErr(e2.message); setBusy(false); }
   }
 
@@ -78,6 +79,10 @@ export default function Composer({ voices, themes, onCreate }) {
             <span className="pill static">▭ 16:9</span>
             <select className="pill" value={language} onChange={(e) => setLanguage(e.target.value)} title="Language">
               {LANGS.map((l) => <option key={l}>🌐 {l}</option>)}
+            </select>
+            <select className="pill" value={visuals} onChange={(e) => setVisuals(e.target.value)} title="Visuals">
+              <option value="illustrated">✦ Illustrated</option>
+              <option value="diagram">▤ Diagram only</option>
             </select>
             <label className="pill check"><input type="checkbox" checked={hand} onChange={(e) => setHand(e.target.checked)} /> ✍ Drawing hand</label>
             <label className="pill check"><input type="checkbox" checked={captions} onChange={(e) => setCaptions(e.target.checked)} /> Captions</label>

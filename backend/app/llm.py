@@ -44,8 +44,17 @@ Scene = {
   "subheading": string|null,             // <= 10 words, optional
   "items": [ {"icon": string|null, "label": string|null, "value": string|null, "caption": string|null, "cue": string|null} ],
   "connections": [ {"from": int, "to": int, "label": string|null, "cue": string|null} ],   // flow scenes only
-  "svg": string|null                     // diagram scenes only
+  "svg": string|null,                    // diagram scenes only
+  "illustration": string|null            // brief for the scene's illustration, see below
 }
+
+## Illustration briefs
+Every scene gets an `illustration`: 1-2 sentences describing ONE clear picture that shows the idea of that scene —
+concrete objects, people doing things, visual metaphors. Say what to draw and how it is arranged; never mention style,
+colours or text (the style is fixed by the theme and text is rendered separately). No words, numbers, labels or signs
+in the picture. Keep it to a single subject or a small group so it reads at a glance. Example: "A person holding an
+empty wallet looks at a shop window with a shiny red scooter inside". For bars/stat/flow/compare/diagram scenes the
+brief is a supporting image (the numbers/structure are drawn separately).
 
 ## Scene types and how `items` are used
 - title: first scene. heading = title, subheading = hook question. items[0].icon = hero icon (optional). Narration = hook.
