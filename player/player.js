@@ -20,6 +20,55 @@ let cameraMode = null;
 let sceneDur = 10;
 let baseScale = 1; // < 1 leaves a free band at the bottom for burned-in captions
 
+// ---- theme --------------------------------------------------------------------------------
+let partsText = null;   // raw lib/parts.svg text; re-parsed per theme so icon ink can be recoloured
+let currentTheme = null;
+const FONTS = { hand: '"Hand", cursive', caveat: '"Script", "Hand", cursive', marker: '"Marker", "Hand", cursive',
+  serif: '"Serif", Georgia, serif', pixel: '"Pixel", monospace', architect: '"Architect", "Hand", cursive',
+  kalam: '"Kalam", "Hand", cursive', oswald: '"Oswald", "Inter", sans-serif' };
+const INK_COLOURS = ["#2b2b2b", "#222222", "#222", "#111111", "#111", "#1b1b1b", "#2c3e50", "#3b2a20", "#2b1a12"];
+
+function applyTheme(th) {
+  const T = Object.assign({ bg: "#fdfcfa", ink: "#222222", primary: "#1f4aa8", accent: "#e08a1e", font_head: "hand",
+    font_body: "hand", background: "plain", filter: "wobble", mono: false, stroke_scale: 1, dark: false }, th || {});
+  currentTheme = T;
+  document.getElementById("bg").setAttribute("fill", T.bg);
+  document.body.style.background = T.bg;
+  const stageEl = document.getElementById("stage");
+  stageEl.style.setProperty("--font-body", FONTS[T.font_body] || FONTS.hand);
+  stageEl.style.setProperty("--font-head", FONTS[T.font_head] || FONTS.hand);
+  // background decoration
+  const decor = document.getElementById("bg-decor");
+  decor.replaceChildren();
+  const add = (html) => { decor.insertAdjacentHTML("beforeend", html); };
+  if (T.background === "paper") add('<rect width="1280" height="720" filter="url(#paper-grain)" opacity=".9"/>');
+  if (T.background === "chalkboard") {
+    add('<rect width="1280" height="720" filter="url(#chalk-dust)"/>');
+    add('<rect x="0" y="0" width="1280" height="720" fill="none" stroke="#8a5a2b" stroke-width="26"/>');
+    add('<rect x="13" y="13" width="1254" height="694" fill="none" stroke="#c89a63" stroke-width="3" opacity=".6"/>');
+  }
+  if (T.background === "blueprint") {
+    add('<rect width="1280" height="720" fill="url(#grid-blueprint)"/>');
+    add('<rect width="1280" height="720" fill="url(#grid-blueprint-big)"/>');
+    add('<rect x="22" y="22" width="1236" height="676" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="2"/>');
+  }
+  if (T.background === "notebook") {
+    add('<rect width="1280" height="720" fill="url(#rules-notebook)"/>');
+    add('<path d="M96,0 V720" stroke="#e58a8a" stroke-width="2" opacity=".8"/>');
+    add('<g fill="#fdfcfa" stroke="#9aa5b1" stroke-width="2"><circle cx="40" cy="120" r="11"/><circle cx="40" cy="360" r="11"/><circle cx="40" cy="600" r="11"/></g>');
+  }
+  if (T.background === "pixelgrid") add('<rect width="1280" height="720" fill="url(#grid-pixel)"/>');
+  // scene filter
+  const f = T.filter === "none" ? "" : `url(#${T.filter})`;
+  scene.style.filter = [f, T.mono ? "grayscale(1) contrast(1.08)" : ""].filter(Boolean).join(" ") || "none";
+  // stroke weight and dark-theme icon ink
+  scene.style.setProperty("--stroke-scale", T.stroke_scale);
+  let txt = partsText;
+  if (T.dark || T.ink.toLowerCase() !== "#222222") for (const c of INK_COLOURS) txt = txt.split(`"${c}"`).join(`"${T.ink}"`);
+  if (T.dark) txt = txt.split('"#fff"').join(`"${T.bg}"`).split('"#ffffff"').join(`"${T.bg}"`);
+  parts = parse(txt);
+}
+
 // ---- drawing hand -------------------------------------------------------------------------
 const stage = document.getElementById("stage");
 const handLayer = document.getElementById("hand");
@@ -42,10 +91,11 @@ async function loadHandAssets() {
 async function buildHands() {
   await loadHandAssets();
   handLayer.replaceChildren();
+  const want = (currentTheme && currentTheme.hand) || "marker";
   for (const kind of ["marker"]) {
     const g = document.createElementNS(NS, "g");
     g.id = "hand-" + kind + "-g";
-    const cfg = handImgs && handImgs[kind];
+    const cfg = handImgs && (handImgs[want] || handImgs.marker);
     if (cfg) {
       const img = document.createElementNS(NS, "image");
       img.setAttribute("href", "../assets/hands/" + cfg.src);
@@ -215,6 +265,14 @@ function applyFits(root) {
 }
 
 function fitTexts(root) {
+  // every text gets an implicit max width: the canvas edge (minus a margin) for left-anchored, symmetric for middle
+  root.querySelectorAll("text").forEach((t) => {
+    if (t.hasAttribute("data-maxw")) return;
+    const x = parseFloat(t.getAttribute("x") || 0), anchor = t.getAttribute("text-anchor") || "start";
+    const ctm = t.getCTM(); const ax = ctm ? ctm.e + x * ctm.a : x;
+    const maxw = anchor === "middle" ? 2 * Math.min(ax, 1280 - ax) - 16 : anchor === "end" ? ax - 20 : 1260 - ax;
+    if (maxw > 40 && t.getBBox().width > maxw) t.setAttribute("data-maxw", maxw.toFixed(0));
+  });
   root.querySelectorAll("text[data-maxw]").forEach((t) => {
     const maxw = Number(t.getAttribute("data-maxw"));
     let fs = parseFloat(t.getAttribute("font-size") || getComputedStyle(t).fontSize);
@@ -226,12 +284,12 @@ function fitTexts(root) {
 }
 
 window.loadScene = async function (def, D) {
-  if (!parts) parts = await fetchSvg("../lib/parts.svg");
+  if (!partsText) partsText = await (await fetch("../lib/parts.svg")).text();
+  applyTheme(def.theme);
   sceneDur = D;
   cameraMode = def.camera || null;
   baseScale = def.safeBottom ? (720 - def.safeBottom) / 720 : 1;
-  handMode = !!def.hand;
-  scene.style.filter = def.mono ? "url(#wobble) grayscale(1) contrast(1.08)" : "url(#wobble)";
+  handMode = !!def.hand && (!currentTheme || currentTheme.hand !== "none");
   if (handMode) await buildHands(); else handLayer.style.display = "none";
   const svg = def.svgText ? parse(`<svg xmlns="${NS}">${def.svgText}</svg>`) : await fetchSvg("../" + def.svg);
   if (svg.nodeName === "parsererror" || svg.querySelector("parsererror")) throw new Error("scene SVG parse error: " + svg.textContent.slice(0, 200));
@@ -247,6 +305,12 @@ window.loadScene = async function (def, D) {
   resolveIncludes(svg);
   for (const child of [...svg.childNodes]) scene.appendChild(document.importNode(child, true));
 
+  if (currentTheme && currentTheme.stroke_scale !== 1) {
+    scene.querySelectorAll("[stroke-width]").forEach((el) => {
+      const w = parseFloat(el.getAttribute("stroke-width"));
+      if (w > 1.6) el.setAttribute("stroke-width", (w * currentTheme.stroke_scale).toFixed(2));
+    });
+  }
   await document.fonts.ready;
   applyFits(scene);
   fitTexts(scene);

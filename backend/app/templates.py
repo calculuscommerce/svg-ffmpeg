@@ -16,7 +16,17 @@ from xml.sax.saxutils import escape
 from .models import Item, Scene
 
 W, H = 1280, 720
-CHAR_W = 0.46  # average glyph width of Patrick Hand in em
+CHAR_W = 0.46  # average glyph width of Patrick Hand in em (default; see FONT_W for other fonts)
+# relative glyph width per font family and the text-size multiplier a theme using it needs
+FONT_W = {"hand": 0.46, "caveat": 0.40, "marker": 0.58, "serif": 0.56, "pixel": 1.0, "architect": 0.55, "kalam": 0.52, "oswald": 0.42}
+FONT_SIZE = {"hand": 1.0, "caveat": 1.1, "marker": 0.85, "serif": 0.85, "pixel": 0.5, "architect": 0.9, "kalam": 0.95, "oswald": 0.95}
+_cur = {"w": CHAR_W, "k": 1.0}
+
+
+def set_font_metrics(T: dict):
+    f = T.get("font_body", "hand")
+    _cur["w"] = FONT_W.get(f, CHAR_W)
+    _cur["k"] = FONT_SIZE.get(f, 1.0)
 
 
 def esc(s: str | None) -> str:
@@ -27,7 +37,7 @@ def wrap(text: str | None, size: float, maxw: float, max_lines: int = 3) -> list
     text = (text or "").strip()
     if not text:
         return []
-    max_chars = max(6, int(maxw / (size * CHAR_W)))
+    max_chars = max(6, int(maxw / (size * _cur["k"] * _cur["w"])))
     words, lines, cur = text.split(), [], ""
     for w in words:
         if cur and len(cur) + 1 + len(w) > max_chars:
@@ -43,20 +53,23 @@ def wrap(text: str | None, size: float, maxw: float, max_lines: int = 3) -> list
 
 
 def text(x, y, s, size, fill, *, id=None, anchor="start", maxw=None, bold=False, cls=None, extra="") -> str:
+    size = round(size * _cur["k"], 1)
     a = [f'x="{x}" y="{y}" font-size="{size}" fill="{fill}" text-anchor="{anchor}"']
     if id: a.append(f'id="{id}"')
     if maxw: a.append(f'data-maxw="{maxw}"')
     if bold: a.append(f'stroke="{fill}" stroke-width="1.4"')
-    if cls: a.append(f'class="{cls}"')
+    classes = " ".join(c for c in [cls, "h" if bold else None] if c)
+    if classes: a.append(f'class="{classes}"')
     return f'<text {" ".join(a)} {extra}>{esc(s)}</text>'
 
 
 def multiline(x, y, lines, size, fill, *, id=None, anchor="start", lh=1.25, bold=False) -> str:
     if not lines:
         return ""
+    size = round(size * _cur["k"], 1)
     a = [f'x="{x}" y="{y}" font-size="{size}" fill="{fill}" text-anchor="{anchor}"']
     if id: a.append(f'id="{id}"')
-    if bold: a.append(f'stroke="{fill}" stroke-width="1.2"')
+    if bold: a.append(f'stroke="{fill}" stroke-width="1.2" class="h"')
     spans = "".join(f'<tspan x="{x}" dy="{0 if i == 0 else size * lh}">{esc(l)}</tspan>' for i, l in enumerate(lines))
     return f'<text {" ".join(a)}>{spans}</text>'
 
@@ -112,10 +125,30 @@ def parse_number(value: str | None) -> dict | None:
     return {"from": 0, "to": v, "prefix": prefix, "suffix": suffix, "grouping": grouping, "decimals": decimals}
 
 
+def hd_text(s: str | None, T: dict) -> str:
+    return (s or "").upper() if T.get("uppercase") else (s or "")
+
+
+def highlight_box(x, y, s, size, T, *, anchor="start", id="hl") -> str:
+    """Marker-highlighter rectangle behind a heading (bold-marker / retro-mint themes)."""
+    w = len(s) * size * _cur["k"] * _cur["w"] * (0.92 if T.get("uppercase") else 1.0) + 28
+    x0 = x - 14 if anchor == "start" else x - w / 2
+    return f'<rect id="{id}" x="{x0:.0f}" y="{y - size * 0.82:.0f}" width="{w:.0f}" height="{size * 1.05:.0f}" rx="8" fill="{T["accent"]}" opacity=".45"/>'
+
+
 def heading(scene: Scene, T: dict, *, y=100, size=64) -> tuple[list[str], list[dict]]:
     parts, anims = [], []
     if scene.heading:
-        parts.append(text(60, y, scene.heading, size, T["primary"], id="hd", maxw=1160, bold=True))
+        h = hd_text(scene.heading, T)
+        if T.get("highlight"):
+            parts.append(highlight_box(60, y, h, size, T, id="hdbox"))
+            anims.append({"sel": "#hdbox", "fx": "wipe", "dur": 0.5, "t": 0.2})
+        lines = wrap(h, size, 1160, 2)
+        if len(lines) > 1:
+            size = round(size * 0.8)
+            parts.append(multiline(60, y - 28, lines, size, T["primary"], id="hd", lh=1.1, bold=True))
+        else:
+            parts.append(text(60, y, h, size, T["primary"], id="hd", maxw=1160, bold=True))
         anims.append({"sel": "#hd", "fx": "wipe", "dur": min(1.6, 0.35 + 0.045 * len(scene.heading)), "t": 0.3})
     if scene.subheading:
         parts.append(text(62, y + 54, scene.subheading, 36, T["muted"], id="sub", maxw=1160))
@@ -139,7 +172,7 @@ def t_title(s: Scene, T) -> tuple[str, list[dict]]:
     tw = 720 if hero else 1160
     tx = 70 if hero else W / 2
     anchor = "start" if hero else "middle"
-    lines = wrap(s.heading or "", 96, tw, 2)
+    lines = wrap(hd_text(s.heading, T), 96, tw, 2)
     p.append(multiline(tx, 260 if len(lines) == 1 else 200, lines, 96, T["primary"], id="hd", anchor=anchor, lh=1.1, bold=True))
     a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
     uy = 300 if len(lines) == 1 else 350
@@ -200,7 +233,7 @@ def t_cards(s: Scene, T) -> tuple[str, list[dict]]:
         col = palette(T)[i % 5]
         x = x0 + i * (w + gap)
         cx = x + w / 2
-        g = [f'<rect x="{x}" y="{y0}" width="{w}" height="{h}" rx="28" fill="#ffffff" stroke="{col}" stroke-width="6"/>']
+        g = [f'<rect x="{x}" y="{y0}" width="{w}" height="{h}" rx="28" fill="{T["card"]}" stroke="{col}" stroke-width="6"/>']
         isz = min(150, w * 0.5)
         if it.icon:
             g.append(icon(cx, y0 + 125, it.icon, isz, col))
@@ -260,7 +293,7 @@ def t_steps(s: Scene, T) -> tuple[str, list[dict]]:
             p.append(arrow(xs[i - 1] + 52, ny, x - 52, ny, T["muted"], id=f"sa{i}", width=5))
             a.append({"sel": f"#sa{i}", "fx": "draw", "dur": 0.5, "rel": 0.35})
         g = [f'<circle cx="{x}" cy="{ny}" r="44" fill="{col}" stroke="{T["ink"]}" stroke-width="4"/>',
-             text(x, ny + 16, str(i + 1), 46, "#ffffff", anchor="middle", bold=True)]
+             text(x, ny + 16, str(i + 1), 46, T["bg"] if T.get("dark") else "#ffffff", anchor="middle", bold=True)]
         if it.icon:
             g.append(icon(x, 275, it.icon, 110, col))
         g.append(text(x, 500, it.label or "", 38, T["ink"], anchor="middle", maxw=940 / max(1, n - 1) - 20 if n > 1 else 600, bold=True))
@@ -365,8 +398,8 @@ def t_flow(s: Scene, T) -> tuple[str, list[dict]]:
             else:
                 my -= 22 if same_row else 0
                 mx += 0 if same_row else 60
-            tw = len(c.label) * 26 * CHAR_W + 20
-            p.append(f'<g id="fl{j}"><rect x="{mx - tw / 2}" y="{my - 22}" width="{tw}" height="32" rx="8" fill="#ffffff"/>'
+            tw = len(c.label) * 26 * _cur["k"] * _cur["w"] + 20
+            p.append(f'<g id="fl{j}"><rect x="{mx - tw / 2}" y="{my - 22}" width="{tw}" height="32" rx="8" fill="{T["card"]}"/>'
                      f'{text(mx, my + 2, c.label, 26, T["accent"], anchor="middle")}</g>')
             a.append({"sel": f"#fl{j}", "fx": "fade", "dur": 0.4, "rel": 0.3})
     return "".join(p), _clean(a)
@@ -379,7 +412,7 @@ def t_compare(s: Scene, T) -> tuple[str, list[dict]]:
     for i, it in enumerate(items):
         x = 60 if i == 0 else 670
         col = cols[i]
-        g = [f'<rect x="{x}" y="200" width="550" height="480" rx="28" fill="#ffffff" stroke="{col}" stroke-width="6"/>']
+        g = [f'<rect x="{x}" y="200" width="550" height="480" rx="28" fill="{T["card"]}" stroke="{col}" stroke-width="6"/>']
         cx = x + 275
         if it.icon:
             g.append(icon(cx, 290, it.icon, 120, col))
@@ -393,7 +426,7 @@ def t_compare(s: Scene, T) -> tuple[str, list[dict]]:
                      f'{text(x + 70, y, pt, 30, T["ink"], maxw=450)}</g>')
             a.append({"sel": f"#cb{i}{k}", "fx": "wipe", "dur": 0.6, "rel": 0.35 if k == 0 else 0.45})
     p.append(f'<g id="vs"><circle cx="640" cy="440" r="46" fill="{T["bad"]}" stroke="{T["ink"]}" stroke-width="4"/>'
-             f'{text(640, 456, "VS", 40, "#ffffff", anchor="middle", bold=True)}</g>')
+             f'{text(640, 456, "VS", 40, T["bg"] if T.get("dark") else "#ffffff", anchor="middle", bold=True)}</g>')
     a.insert(len([x for x in a if x["sel"] in ("#hd", "#sub")]) + 1, {"sel": "#vs", "fx": "pop", "dur": 0.5, "rel": 0.3})
     return "".join(p), _clean(a)
 
@@ -454,7 +487,7 @@ def t_diagram(s: Scene, T) -> tuple[str, list[dict]]:
 
 def t_outro(s: Scene, T) -> tuple[str, list[dict]]:
     p, a = [], []
-    lines = wrap(s.heading or "", 76, 1120, 2)
+    lines = wrap(hd_text(s.heading, T), 76, 1120, 2)
     p.append(multiline(W / 2, 250, lines, 76, T["primary"], id="hd", anchor="middle", lh=1.15, bold=True))
     a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
     uy = 250 + (len(lines) - 1) * 88 + 44
@@ -468,7 +501,7 @@ def t_outro(s: Scene, T) -> tuple[str, list[dict]]:
         for i, it in enumerate(items):
             x = x0 + i * (pw + 30)
             col = palette(T)[i % 5]
-            g = [f'<rect x="{x}" y="440" width="{pw}" height="120" rx="60" fill="#ffffff" stroke="{col}" stroke-width="5"/>']
+            g = [f'<rect x="{x}" y="440" width="{pw}" height="120" rx="60" fill="{T["card"]}" stroke="{col}" stroke-width="5"/>']
             if it.icon:
                 g.append(icon(x + 62, 500, it.icon, 64, col))
             g.append(multiline(x + (110 if it.icon else pw / 2), 510 - (12 if len(wrap(it.label, 32, pw - 130, 2)) > 1 else 0),
@@ -485,6 +518,7 @@ TEMPLATES = {
 
 
 def render_scene(scene: Scene, T: dict) -> tuple[str, list[dict]]:
+    set_font_metrics(T)
     fn = TEMPLATES.get(scene.type, t_list)
     return fn(scene, T)
 

@@ -11,26 +11,29 @@ from fastapi.staticfiles import StaticFiles
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-from . import jobs, llm, tts  # noqa: E402
+from . import jobs, llm, thumbs, tts  # noqa: E402
 from .models import CreateProject, Storyboard  # noqa: E402
-from .themes import THEMES  # noqa: E402
+from .themes import GALLERY, THEMES  # noqa: E402
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     task = asyncio.create_task(jobs.worker())
+    thumb_task = asyncio.create_task(thumbs.ensure_thumbs())
     yield
-    task.cancel()
+    task.cancel(); thumb_task.cancel()
 
 
 app = FastAPI(title="Whiteboard video generator", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/media", StaticFiles(directory=str(jobs.DATA)), name="media")
+thumbs.OUT.mkdir(parents=True, exist_ok=True)
+app.mount("/themes", StaticFiles(directory=str(thumbs.OUT)), name="themes")
 
 
 def _summary(p: dict) -> dict:
     return {k: p.get(k) for k in ("id", "title", "status", "progress", "message", "created_at", "duration", "video_url")} | {
-        "input": {"duration": p["input"]["duration"], "prompt": p["input"]["prompt"][:120]}}
+        "input": {"duration": p["input"]["duration"], "prompt": (p["input"].get("script") or p["input"].get("prompt") or "")[:120]}}
 
 
 @app.get("/api/health")
@@ -38,17 +41,29 @@ async def health():
     return {"ok": True}
 
 
+_voices_cache: dict = {}
+
+
 @app.get("/api/voices")
 async def voices():
+    import time
+    if _voices_cache.get("at", 0) > time.time() - 600:
+        return _voices_cache["v"]
     try:
-        return await tts.list_voices()
+        v = await tts.list_voices()
     except Exception as e:  # noqa: BLE001
         raise HTTPException(502, f"ElevenLabs: {e}")
+    _voices_cache.update(v=v, at=time.time())
+    return v
 
 
 @app.get("/api/themes")
 async def themes():
-    return [{"name": k, **v} for k, v in THEMES.items()]
+    try:
+        await thumbs.ensure_thumbs()
+    except Exception:  # noqa: BLE001
+        pass
+    return [{**THEMES[n], "thumb_url": f"/themes/{n}.png" if thumbs.thumb_path(n).exists() else None} for n in GALLERY]
 
 
 @app.get("/api/assets")
@@ -64,6 +79,10 @@ async def list_projects():
 
 @app.post("/api/projects", status_code=201)
 async def create_project(inp: CreateProject):
+    if inp.mode == "script" and not (inp.script or "").strip():
+        raise HTTPException(422, "script is required in own-script mode")
+    if inp.mode == "prompt" and len(inp.prompt.strip()) < 3:
+        raise HTTPException(422, "prompt is too short")
     p = jobs.store.create(inp)
     await jobs.queue.put(p["id"])
     return p

@@ -6,24 +6,64 @@
 <style>
   @font-face { font-family: "Hand"; src: url("../fonts/PatrickHand.ttf"); }
   @font-face { font-family: "Script"; src: url("../fonts/Caveat.ttf"); }
+  @font-face { font-family: "Marker"; src: url("../fonts/PermanentMarker.ttf"); }
+  @font-face { font-family: "Serif"; src: url("../fonts/LibreBaskerville.ttf"); }
+  @font-face { font-family: "SerifItalic"; src: url("../fonts/LibreBaskervilleItalic.ttf"); }
+  @font-face { font-family: "Pixel"; src: url("../fonts/PressStart2P.ttf"); }
+  @font-face { font-family: "Architect"; src: url("../fonts/ArchitectsDaughter.ttf"); }
+  @font-face { font-family: "Kalam"; src: url("../fonts/Kalam.ttf"); }
+  @font-face { font-family: "Oswald"; src: url("../fonts/Oswald.ttf"); }
   html, body { margin: 0; background: #fdfcfa; overflow: hidden; }
   svg { display: block; width: 1280px; height: 720px; }
-  text { font-family: "Hand", "Marker Felt", "Bradley Hand", cursive; }
+  #stage { --font-body: "Hand", cursive; --font-head: "Hand", cursive; }
+  text { font-family: var(--font-body); }
+  text.h { font-family: var(--font-head); }
   text.script { font-family: "Script", "Hand", cursive; }
 </style>
 </head>
 <body>
 <svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
   <defs>
+    <!-- hand-drawn boil -->
     <filter id="wobble" x="-2%" y="-2%" width="104%" height="104%">
       <feTurbulence id="wobble-noise" type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="1" result="n"/>
       <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
+    <!-- chalk: wobble + grainy erosion of the alpha -->
+    <filter id="chalk" x="-3%" y="-3%" width="106%" height="106%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" seed="3" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="3" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="7" result="grain"/>
+      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.6 -0.25" result="gmask"/>
+      <feComposite in="d" in2="gmask" operator="in"/>
+    </filter>
+    <!-- pencil: light wobble, softened, slightly translucent graphite -->
+    <filter id="pencil" x="-3%" y="-3%" width="106%" height="106%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="5" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="2" seed="9" result="grain"/>
+      <feColorMatrix in="grain" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.1 0.05" result="gmask"/>
+      <feComposite in="d" in2="gmask" operator="in" result="g"/>
+      <feComponentTransfer in="g"><feFuncA type="linear" slope="0.92"/></feComponentTransfer>
+    </filter>
+    <!-- neon: coloured glow around every stroke -->
+    <filter id="neon" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b2"/>
+      <feMerge><feMergeNode in="b2"/><feMergeNode in="b1"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- background textures -->
+    <filter id="paper-grain"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="2"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncA type="linear" slope="0.08"/></feComponentTransfer></filter>
+    <filter id="chalk-dust"><feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="11"/><feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.14 0"/></filter>
+    <pattern id="grid-blueprint" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40,0 H0 V40" fill="none" stroke="#ffffff" stroke-opacity=".12" stroke-width="1"/></pattern>
+    <pattern id="grid-blueprint-big" width="200" height="200" patternUnits="userSpaceOnUse"><path d="M200,0 H0 V200" fill="none" stroke="#ffffff" stroke-opacity=".2" stroke-width="1.5"/></pattern>
+    <pattern id="rules-notebook" width="1280" height="36" patternUnits="userSpaceOnUse"><path d="M0,35.5 H1280" stroke="#9db7e8" stroke-opacity=".55" stroke-width="1.5"/></pattern>
+    <pattern id="grid-pixel" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M16,0 H0 V16" fill="none" stroke="#ffffff" stroke-opacity=".06" stroke-width="1"/></pattern>
     <g id="scene-defs"></g>
   </defs>
   <rect id="bg" width="1280" height="720" fill="#fdfcfa"/>
+  <g id="bg-decor"></g>
   <g id="camera"><g id="scene" filter="url(#wobble)"></g></g>
-  <!-- the drawing hand sits above everything and outside the camera/wobble -->
   <g id="hand" style="display:none"></g>
 </svg>
 <script src="player.js"></script>

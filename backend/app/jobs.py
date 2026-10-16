@@ -12,7 +12,7 @@ from pathlib import Path
 
 from . import compose, llm, tts
 from .models import CreateProject, Storyboard
-from .themes import theme as get_theme
+from .themes import player_theme, theme as get_theme
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data" / "projects"
@@ -96,7 +96,7 @@ async def run(p: dict):
         _update(p, status="writing", progress=8, message="Using edited storyboard")
     else:
         _update(p, status="writing", progress=3, message="Writing the script and storyboard…")
-        sb = await llm.generate_storyboard(inp.prompt, inp.duration, inp.language, inp.theme)
+        sb = await llm.generate_storyboard(inp.prompt, inp.duration, inp.language, inp.theme, script=inp.script if inp.mode == "script" else None)
         _update(p, storyboard=sb.model_dump(by_alias=True), title=sb.title, progress=12,
                 message=f"Storyboard ready: {len(sb.scenes)} scenes")
 
@@ -123,7 +123,7 @@ async def run(p: dict):
     spec_scenes, offsets, offset = [], [], 0.0
     for i, (sc, (mp3, words, adur)) in enumerate(zip(sb.scenes, voiced)):
         s = compose.compose_scene(sc, T, words, adur, is_last=(i == len(sb.scenes) - 1), hand=inp.hand)
-        s.update({"id": i, "audio": mp3, "thumb": str(pdir / f"thumb_{i}.png"), "hand": inp.hand, "mono": bool(T.get("mono"))})
+        s.update({"id": i, "audio": mp3, "thumb": str(pdir / f"thumb_{i}.png"), "hand": inp.hand and T.get("hand") != "none", "mono": bool(T.get("mono"))})
         spec_scenes.append(s)
         offsets.append((offset, words))
         offset += s["duration"]
@@ -134,7 +134,7 @@ async def run(p: dict):
     else:
         compose.srt(offsets, str(pdir / "captions.srt"))
     spec = {"fps": 24, "scale": 1.5 if inp.hd else 1, "concurrency": 3, "lead": compose.LEAD,
-            "captions": captions, "scenes": spec_scenes}
+            "captions": captions, "theme": player_theme(T), "scenes": spec_scenes}
     (pdir / "spec.json").write_text(json.dumps(spec))
     p["scenes"] = [{"index": i, "type": sc.type, "heading": sc.heading, "narration": sc.narration,
                     "duration": s["duration"], "start": offsets[i][0], "thumb_url": f"/media/{p['id']}/thumb_{i}.png"}

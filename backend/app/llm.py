@@ -90,14 +90,33 @@ def _system(duration: int, language: str) -> str:
     )
 
 
-async def generate_storyboard(prompt: str, duration: int, language: str = "English", theme: str = "auto") -> Storyboard:
+SCRIPT_MODE = """
+
+## OWN-SCRIPT MODE (overrides the writing rules above)
+The user has written the narration themselves. You are the director, not the writer:
+- Split their script into scenes at natural breaks. Each scene's `narration` must be a VERBATIM, contiguous slice of the
+  user's script — do not add, remove, reorder or rephrase a single word. Concatenating all scene narrations must
+  reproduce the script exactly (whitespace aside). Ignore the word budget; the script's length decides the video length.
+- Choose the scene type, heading, items, icons and cues for each slice so the visuals illustrate what is being said.
+- Follow any visual instructions the user gives (style, audience, what to show).
+"""
+
+
+async def generate_storyboard(prompt: str, duration: int, language: str = "English", theme: str = "auto",
+                              script: str | None = None) -> Storyboard:
     client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
     model = os.environ.get("OPENAI_MODEL", "gpt-4.1")
-    user = f"Create the storyboard for a {duration}-second video.\n\n"
-    if theme and theme != "auto":
-        user += f"Use theme: {theme}.\n\n"
-    user += f"Topic / source content from the user:\n\"\"\"\n{prompt.strip()}\n\"\"\""
-    messages = [{"role": "system", "content": _system(duration, language)}, {"role": "user", "content": user}]
+    system = _system(duration, language)
+    if script:
+        system += SCRIPT_MODE
+        user = "Create the storyboard for this script.\n\n"
+        if prompt.strip():
+            user += f"Visual instructions from the user:\n\"\"\"\n{prompt.strip()}\n\"\"\"\n\n"
+        user += f"SCRIPT (narrate exactly as written):\n\"\"\"\n{script.strip()}\n\"\"\""
+    else:
+        user = f"Create the storyboard for a {duration}-second video.\n\n"
+        user += f"Topic / source content from the user:\n\"\"\"\n{prompt.strip()}\n\"\"\""
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
     last_err = None
     for attempt in range(3):
         resp = await client.chat.completions.create(
@@ -107,7 +126,7 @@ async def generate_storyboard(prompt: str, duration: int, language: str = "Engli
         try:
             data = json.loads(txt)
             sb = Storyboard.model_validate(data)
-            problems = _lint(sb, duration)
+            problems = _lint(sb, duration, script)
             hard = [p for p in problems if not p.startswith("soft:")]
             # soft problems (word budget) get one trim request, then we accept the storyboard
             if not hard and (not problems or attempt >= 1):
@@ -122,11 +141,20 @@ async def generate_storyboard(prompt: str, duration: int, language: str = "Engli
     raise RuntimeError(f"storyboard generation failed: {last_err}")
 
 
-def _lint(sb: Storyboard, duration: int) -> list[str]:
+def _norm_words(t: str) -> list[str]:
+    return re.sub(r"[^\w\s]", "", t.lower()).split()
+
+
+def _lint(sb: Storyboard, duration: int, script: str | None = None) -> list[str]:
     p = []
     b = BUDGET[duration]
     total = sum(len(s.narration.split()) for s in sb.scenes)
-    if total > b["max_words"] * 1.08:
+    if script:
+        want, got = _norm_words(script), _norm_words(" ".join(s.narration for s in sb.scenes))
+        if want != got:
+            p.append("the scene narrations do not reproduce the user's script verbatim; every word must be kept, "
+                     "in order, with nothing added — only split it into scenes")
+    elif total > b["max_words"] * 1.08:
         p.append(f"soft:narration is {total} words in total; the limit for a {duration}s video is {b['max_words']}. "
                  f"Cut it to {b['words']} words by tightening every scene (keep the same scenes and facts)")
     if len(sb.scenes) > b["max_scenes"]:

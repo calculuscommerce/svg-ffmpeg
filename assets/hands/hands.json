@@ -18,5 +18,25 @@
     "natural_width": 2100,
     "natural_height": 1636,
     "width": 1470
+  },
+  "chalk": {
+    "src": "chalk.png",
+    "tip": [
+      661,
+      137
+    ],
+    "natural_width": 2100,
+    "natural_height": 1636,
+    "width": 1470
+  },
+  "pencil": {
+    "src": "pencil.png",
+    "tip": [
+      661,
+      137
+    ],
+    "natural_width": 2100,
+    "natural_height": 1636,
+    "width": 1470
   }
 }

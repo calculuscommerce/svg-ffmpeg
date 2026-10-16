@@ -43,7 +43,9 @@ class Storyboard(BaseModel):
 
 
 class CreateProject(BaseModel):
-    prompt: str = Field(min_length=3, max_length=20000)
+    mode: Literal["prompt", "script"] = "prompt"
+    prompt: str = Field(default="", max_length=20000)          # topic/content (prompt mode) or visual instructions (script mode)
+    script: Optional[str] = Field(default=None, max_length=20000)  # narrated exactly as written (script mode)
     duration: Literal[30, 60, 300] = 60
     voice_id: Optional[str] = None
     theme: str = "auto"
@@ -51,3 +53,6 @@ class CreateProject(BaseModel):
     language: str = "English"
     hd: bool = False
     hand: bool = False  # show a drawing hand that traces strokes and places elements
+
+    def text_for_title(self) -> str:
+        return (self.script or self.prompt or "").strip()

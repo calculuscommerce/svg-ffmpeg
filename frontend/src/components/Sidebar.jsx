@@ -23,7 +23,7 @@ export default function Sidebar({ projects, selected, onSelect, onNew, onDelete 
           <div key={p.id} className={"pitem " + (selected === p.id ? "active" : "")} onClick={() => onSelect(p.id)}>
             <div className={"dot " + p.status} title={p.status} />
             <div className="pinfo">
-              <div className="ptitle">{p.title || p.input.prompt.slice(0, 48) || "Untitled"}</div>
+              <div className="ptitle">{p.title || (p.input.prompt || "").slice(0, 48) || "Untitled"}</div>
               <div className="pmeta">
                 {DUR[p.input.duration]} · {p.status === "done" ? `${p.duration}s` : p.status === "error" ? "failed" : `${p.progress}%`} · {fmtAgo(p.created_at)}
               </div>
