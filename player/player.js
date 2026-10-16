@@ -56,6 +56,7 @@ async function buildHands() {
       img.setAttribute("width", nat); img.setAttribute("height", cfg.natural_height || nat);
       img.setAttribute("transform", `scale(${s}) translate(${-cfg.tip[0]},${-cfg.tip[1]})`);
       g.appendChild(img);
+      g.style.filter = "drop-shadow(10px 16px 14px rgba(0,0,0,.22))";
     } else {
       const src = parts.querySelector("#hand-" + kind);
       for (const a of src.attributes) if (a.name !== "id") g.setAttribute(a.name, a.value);

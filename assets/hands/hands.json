@@ -1,0 +1,22 @@
+{
+  "marker": {
+    "src": "marker.png",
+    "tip": [
+      661,
+      137
+    ],
+    "natural_width": 2000,
+    "natural_height": 1641,
+    "width": 1400
+  },
+  "pinch": {
+    "src": "pinch.png",
+    "tip": [
+      724,
+      220
+    ],
+    "natural_width": 2000,
+    "natural_height": 1641,
+    "width": 1400
+  }
+}
