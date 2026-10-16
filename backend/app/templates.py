@@ -1,0 +1,506 @@
+"""Scene templates: Scene (from the LLM) -> (SVG fragment, ordered animation list).
+
+Each anim is {"sel": css, "fx": name, ...} plus ONE timing hint:
+  "cue": phrase       appear when this phrase is spoken (resolved against TTS word timestamps)
+  "rel": seconds      offset from the previous anim's start
+  "t":   seconds      absolute
+  (none)              spread evenly between neighbouring known times
+Canvas is 1280x720; content area y 190..690.
+"""
+from __future__ import annotations
+
+import math
+import re
+from xml.sax.saxutils import escape
+
+from .models import Item, Scene
+
+W, H = 1280, 720
+CHAR_W = 0.46  # average glyph width of Patrick Hand in em
+
+
+def esc(s: str | None) -> str:
+    return escape(s or "")
+
+
+def wrap(text: str | None, size: float, maxw: float, max_lines: int = 3) -> list[str]:
+    text = (text or "").strip()
+    if not text:
+        return []
+    max_chars = max(6, int(maxw / (size * CHAR_W)))
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > max_chars:
+            lines.append(cur); cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        lines.append(cur)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip(".,;") + "…"
+    return lines
+
+
+def text(x, y, s, size, fill, *, id=None, anchor="start", maxw=None, bold=False, cls=None, extra="") -> str:
+    a = [f'x="{x}" y="{y}" font-size="{size}" fill="{fill}" text-anchor="{anchor}"']
+    if id: a.append(f'id="{id}"')
+    if maxw: a.append(f'data-maxw="{maxw}"')
+    if bold: a.append(f'stroke="{fill}" stroke-width="1.4"')
+    if cls: a.append(f'class="{cls}"')
+    return f'<text {" ".join(a)} {extra}>{esc(s)}</text>'
+
+
+def multiline(x, y, lines, size, fill, *, id=None, anchor="start", lh=1.25, bold=False) -> str:
+    if not lines:
+        return ""
+    a = [f'x="{x}" y="{y}" font-size="{size}" fill="{fill}" text-anchor="{anchor}"']
+    if id: a.append(f'id="{id}"')
+    if bold: a.append(f'stroke="{fill}" stroke-width="1.2"')
+    spans = "".join(f'<tspan x="{x}" dy="{0 if i == 0 else size * lh}">{esc(l)}</tspan>' for i, l in enumerate(lines))
+    return f'<text {" ".join(a)}>{spans}</text>'
+
+
+def icon(x, y, name, size, color, *, id=None, anchor="center") -> str:
+    if not name:
+        return ""
+    idattr = f'id="{id}"' if id else ""
+    return (f'<g transform="translate({x},{y})"><g {idattr} data-include="{esc(name)}" data-fit="{size} {size}" '
+            f'data-anchor="{anchor}" style="color:{color}"/></g>')
+
+
+def arrow(x1, y1, x2, y2, color, *, id=None, width=6, curve=0.0, dashed=False) -> str:
+    """Straight or gently curved arrow with a head. curve = perpendicular bulge in px."""
+    dx, dy = x2 - x1, y2 - y1
+    L = math.hypot(dx, dy) or 1
+    nx, ny = -dy / L, dx / L
+    cx, cy = (x1 + x2) / 2 + nx * curve, (y1 + y2) / 2 + ny * curve
+    # head direction = tangent at end
+    tx, ty = x2 - cx, y2 - cy
+    ang = math.degrees(math.atan2(ty, tx))
+    dash = ' stroke-dasharray="14 12"' if dashed else ""
+    idattr = f'id="{id}"' if id else ""
+    return (f'<g {idattr} fill="none" stroke="{color}" stroke-width="{width}" stroke-linecap="round" stroke-linejoin="round">'
+            f'<path d="M{x1:.1f},{y1:.1f} Q{cx:.1f},{cy:.1f} {x2:.1f},{y2:.1f}"{dash}/>'
+            f'<path d="M-18,-12 L0,0 L-18,12" transform="translate({x2:.1f},{y2:.1f}) rotate({ang:.1f})"/></g>')
+
+
+NUM_RE = re.compile(r"^\s*([^\d\-]*?)\s*(-?\d[\d,]*(?:\.\d+)?)\s*(.*?)\s*$")
+
+
+def parse_number(value: str | None) -> dict | None:
+    """'₹1,00,000' -> count-anim params. None if not numeric."""
+    if not value:
+        return None
+    m = NUM_RE.match(value)
+    if not m:
+        return None
+    prefix, num, suffix = m.groups()
+    if suffix and value[m.end(2):m.start(3)].strip() == "" and m.end(2) < m.start(3):
+        suffix = " " + suffix
+    try:
+        v = float(num.replace(",", ""))
+    except ValueError:
+        return None
+    if re.search(r"\d,\d\d,\d\d\d", num):
+        grouping = "indian"
+    elif "," in num:
+        grouping = "intl"
+    else:
+        grouping = "none" if len(num) <= 4 else "intl"
+    decimals = len(num.split(".")[1]) if "." in num else 0
+    return {"from": 0, "to": v, "prefix": prefix, "suffix": suffix, "grouping": grouping, "decimals": decimals}
+
+
+def heading(scene: Scene, T: dict, *, y=100, size=64) -> tuple[list[str], list[dict]]:
+    parts, anims = [], []
+    if scene.heading:
+        parts.append(text(60, y, scene.heading, size, T["primary"], id="hd", maxw=1160, bold=True))
+        anims.append({"sel": "#hd", "fx": "wipe", "dur": min(1.6, 0.35 + 0.045 * len(scene.heading)), "t": 0.3})
+    if scene.subheading:
+        parts.append(text(62, y + 54, scene.subheading, 36, T["muted"], id="sub", maxw=1160))
+        anims.append({"sel": "#sub", "fx": "wipe", "dur": 1.0, "rel": 0.7})
+    return parts, anims
+
+
+def cue(it: Item | None):
+    return it.cue if it and it.cue else None
+
+
+def palette(T):
+    return [T["primary"], T["accent"], T["good"], T["secondary"], T["bad"]]
+
+
+# ---------------------------------------------------------------- templates
+
+def t_title(s: Scene, T) -> tuple[str, list[dict]]:
+    hero = s.items[0].icon if s.items else None
+    p, a = [], []
+    tw = 720 if hero else 1160
+    tx = 70 if hero else W / 2
+    anchor = "start" if hero else "middle"
+    lines = wrap(s.heading or "", 96, tw, 2)
+    p.append(multiline(tx, 260 if len(lines) == 1 else 200, lines, 96, T["primary"], id="hd", anchor=anchor, lh=1.1, bold=True))
+    a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
+    uy = 300 if len(lines) == 1 else 350
+    ux1, ux2 = (70, 70 + min(tw, 46 * len(lines[0]) if lines else 400)) if hero else (W / 2 - 260, W / 2 + 260)
+    p.append(f'<path id="ul" d="M{ux1},{uy} C{ux1 + 100},{uy - 8} {ux2 - 120},{uy + 10} {ux2},{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="8" stroke-linecap="round"/>')
+    a.append({"sel": "#ul", "fx": "draw", "dur": 0.7, "rel": 1.0})
+    if s.subheading:
+        sl = wrap(s.subheading, 46, tw, 2)
+        p.append(multiline(tx, uy + 70, sl, 46, T["ink"], id="sub", anchor=anchor))
+        a.append({"sel": "#sub", "fx": "wipe", "dur": 1.2, "rel": 0.5})
+    if hero:
+        p.append(icon(1000, 400, hero, 420, T["primary"], id="hero"))
+        a.append({"sel": "#hero", "fx": "pop", "dur": 0.8, "cue": cue(s.items[0]) or None, "rel": None if cue(s.items[0]) else 0.4})
+        a.append({"sel": "#hero", "fx": "bob", "dy": 7, "period": 3.0, "rel": 0.8})
+    return "".join(p), _clean(a)
+
+
+def t_concept(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    hero = s.items[0] if s.items else None
+    callouts = s.items[1:5]
+    hx, hy = 640, 450
+    if hero and hero.icon:
+        p.append(icon(hx, hy, hero.icon, 360, T["primary"], id="hero"))
+        a.append({"sel": "#hero", "fx": "pop", "dur": 0.8, "rel": 0.5})  # hero shows right after the heading; callouts follow the cues
+        if hero.label:
+            p.append(text(hx, 665, hero.label, 36, T["muted"], id="hlabel", anchor="middle", maxw=400))
+            a.append({"sel": "#hlabel", "fx": "wipe", "dur": 0.8, "rel": 0.5})
+    slots = [(70, 260, "L", -70), (70, 560, "L", 70), (900, 260, "R", -70), (900, 560, "R", 70)]
+    if len(callouts) <= 2:
+        slots = [(70, 290, "L", -60), (900, 290, "R", -60), (70, 560, "L", 70), (900, 560, "R", 70)][: len(callouts)]
+    for i, (it, (x, y, side, oy)) in enumerate(zip(callouts, slots)):
+        col = palette(T)[i % 5]
+        p.append(text(x, y, it.label or "", 42, col, id=f"cl{i}", maxw=320, bold=True))
+        cap = wrap(it.caption, 28, 320, 2)
+        p.append(multiline(x, y + 40, cap, 28, T["muted"], id=f"cc{i}"))
+        if side == "L":
+            x1, x2 = x + 330, hx - 150
+        else:
+            x1, x2 = x - 20, hx + 150
+        p.append(f'<path id="ln{i}" d="M{x1},{y - 12} L{x2},{hy + oy}" fill="none" stroke="{col}" stroke-width="3.5" stroke-dasharray="2 10" stroke-linecap="round"/>'
+                 f'<circle id="dot{i}" cx="{x2}" cy="{hy + oy}" r="7" fill="{col}"/>')
+        a.append({"sel": f"#ln{i}", "fx": "draw", "dur": 0.5, "cue": cue(it)})
+        a.append({"sel": f"#dot{i}", "fx": "pop", "dur": 0.4, "rel": 0.3})
+        a.append({"sel": f"#cl{i}", "fx": "wipe", "dur": 0.7, "rel": 0.1})
+        if cap:
+            a.append({"sel": f"#cc{i}", "fx": "wipe", "dur": 0.9, "rel": 0.4})
+    return "".join(p), _clean(a)
+
+
+def t_cards(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    items = s.items[:4] or [Item(label="—")]
+    n = len(items)
+    gap, x0, y0, h = 30, 60, 200, 470
+    w = (1160 - gap * (n - 1)) / n
+    for i, it in enumerate(items):
+        col = palette(T)[i % 5]
+        x = x0 + i * (w + gap)
+        cx = x + w / 2
+        g = [f'<rect x="{x}" y="{y0}" width="{w}" height="{h}" rx="28" fill="#ffffff" stroke="{col}" stroke-width="6"/>']
+        isz = min(150, w * 0.5)
+        if it.icon:
+            g.append(icon(cx, y0 + 125, it.icon, isz, col))
+        g.append(text(cx, y0 + 255, it.label or "", 46, T["ink"], anchor="middle", maxw=w - 40, bold=True))
+        num = parse_number(it.value)
+        if it.value:
+            g.append(text(cx, y0 + 335, it.value if not num else "", 60, col, id=f"v{i}", anchor="middle", maxw=w - 40, bold=True))
+        cap = wrap(it.caption, 28, w - 50, 2)
+        g.append(multiline(cx, y0 + 395, cap, 28, T["muted"], anchor="middle"))
+        p.append(f'<g id="card{i}">{"".join(g)}</g>')
+        a.append({"sel": f"#card{i}", "fx": "pop", "dur": 0.6, "cue": cue(it)})
+        if num:
+            a.append({"sel": f"#v{i}", "fx": "count", "dur": 1.2, "rel": 0.4, **num})
+    return "".join(p), _clean(a)
+
+
+def t_bars(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    items = s.items[:5]
+    n = max(1, len(items))
+    nums = [parse_number(it.value) for it in items]
+    vals = [x["to"] if x else 0 for x in nums]
+    mx = max([abs(v) for v in vals] + [1])
+    row = 470 / n
+    bh = min(76, row - 28)
+    y0 = 215 + (470 - row * n) / 2
+    for i, it in enumerate(items):
+        col = palette(T)[i % 5]
+        y = y0 + i * row
+        p.append(text(70, y + bh / 2 + 14, it.label or "", 38, T["ink"], id=f"bl{i}", maxw=300))
+        full = 690 * (abs(vals[i]) / mx if nums[i] else 1.0)
+        p.append(f'<rect id="bar{i}" x="400" y="{y}" width="{max(8, full):.1f}" height="{bh}" rx="{min(14, bh / 2)}" fill="{col}" stroke="{T["ink"]}" stroke-width="3"/>')
+        p.append(text(1215, y + bh / 2 + 14, it.value if not nums[i] else "", 40, col, id=f"bv{i}", anchor="end", bold=True))
+        if it.caption:
+            p.append(text(70, y + bh / 2 + 44, it.caption, 24, T["muted"], id=f"bc{i}", maxw=300))
+        a.append({"sel": f"#bl{i}", "fx": "wipe", "dur": 0.6, "cue": cue(it)})
+        a.append({"sel": f"#bar{i}", "fx": "scalex", "dur": 1.0, "rel": 0.15, "from": 0, "to": 1, "origin": "0% 50%"})
+        if nums[i]:
+            a.append({"sel": f"#bv{i}", "fx": "count", "dur": 1.0, "rel": 0.0, **nums[i]})
+        else:
+            a.append({"sel": f"#bv{i}", "fx": "fade", "dur": 0.5, "rel": 0.6})
+        if it.caption:
+            a.append({"sel": f"#bc{i}", "fx": "fade", "dur": 0.5, "rel": 0.3})
+    return "".join(p), _clean(a)
+
+
+def t_steps(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    items = s.items[:5]
+    n = max(1, len(items))
+    xs = [W / 2] if n == 1 else [170 + i * (940 / (n - 1)) for i in range(n)]
+    ny = 400
+    for i, it in enumerate(items):
+        x = xs[i]
+        col = palette(T)[i % 5]
+        if i > 0:
+            p.append(arrow(xs[i - 1] + 52, ny, x - 52, ny, T["muted"], id=f"sa{i}", width=5))
+            a.append({"sel": f"#sa{i}", "fx": "draw", "dur": 0.5, "rel": 0.35})
+        g = [f'<circle cx="{x}" cy="{ny}" r="44" fill="{col}" stroke="{T["ink"]}" stroke-width="4"/>',
+             text(x, ny + 16, str(i + 1), 46, "#ffffff", anchor="middle", bold=True)]
+        if it.icon:
+            g.append(icon(x, 275, it.icon, 110, col))
+        g.append(text(x, 500, it.label or "", 38, T["ink"], anchor="middle", maxw=940 / max(1, n - 1) - 20 if n > 1 else 600, bold=True))
+        g.append(multiline(x, 545, wrap(it.caption, 26, (940 / max(1, n - 1) - 10) if n > 1 else 700, 2), 26, T["muted"], anchor="middle"))
+        p.append(f'<g id="st{i}">{"".join(g)}</g>')
+        a.append({"sel": f"#st{i}", "fx": "pop", "dur": 0.6, "cue": cue(it), "origin": "50% 40%"})
+    return "".join(p), _clean(a)
+
+
+def t_list(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    items = s.items[:5]
+    n = max(1, len(items))
+    row = min(100, 470 / n)
+    y0 = 240 + (470 - row * n) / 2
+    for i, it in enumerate(items):
+        y = y0 + i * row
+        col = palette(T)[i % 5]
+        p.append(icon(105, y, it.icon or "check", 62, col if it.icon else T["good"], id=f"li{i}"))
+        p.append(text(165, y + 15, it.label or "", 44, T["ink"], id=f"ll{i}", maxw=1040))
+        a.append({"sel": f"#li{i}", "fx": "pop", "dur": 0.5, "cue": cue(it)})
+        a.append({"sel": f"#ll{i}", "fx": "wipe", "dur": 0.8, "rel": 0.15})
+    return "".join(p), _clean(a)
+
+
+def t_stat(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    items = s.items[:3]
+    n = max(1, len(items))
+    cw = 1160 / n
+    for i, it in enumerate(items):
+        cx = 60 + cw * (i + 0.5)
+        col = palette(T)[i % 5]
+        if it.icon:
+            p.append(icon(cx, 290, it.icon, 120, col, id=f"si{i}"))
+            a.append({"sel": f"#si{i}", "fx": "pop", "dur": 0.6, "cue": cue(it)})
+        num = parse_number(it.value)
+        size = 128 if n == 1 else 96
+        p.append(text(cx, 460, it.value if not num else "", size, col, id=f"sv{i}", anchor="middle", maxw=cw - 40, bold=True))
+        if num:
+            a.append({"sel": f"#sv{i}", "fx": "count", "dur": 1.4, "cue": None if it.icon else cue(it), "rel": 0.3 if it.icon else None, **num})
+        else:
+            a.append({"sel": f"#sv{i}", "fx": "pop", "dur": 0.6, "cue": None if it.icon else cue(it), "rel": 0.3 if it.icon else None})
+        p.append(multiline(cx, 530, wrap(it.label, 36, cw - 60, 2), 36, T["muted"], id=f"sl{i}", anchor="middle"))
+        a.append({"sel": f"#sl{i}", "fx": "wipe", "dur": 0.8, "rel": 0.5})
+    return "".join(p), _clean(a)
+
+
+def t_flow(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    items = s.items[:6]
+    n = len(items)
+    nw, nh = (200 if n == 4 else 230), 118
+    if n <= 4:
+        span = {1: 0, 2: 580, 3: 840, 4: 960}[n]
+        xs = [W / 2 - span / 2 + i * (span / max(1, n - 1)) for i in range(n)] if n > 1 else [W / 2]
+        pos = [(x, 430) for x in xs]
+    else:
+        top = math.ceil(n / 2)
+        bot = n - top
+        pos = [(200 + i * (880 / max(1, top - 1)), 300) for i in range(top)]
+        pos += [(200 + i * (880 / max(1, bot - 1)) if bot > 1 else W / 2, 570) for i in range(bot)]
+    for i, it in enumerate(items):
+        x, y = pos[i]
+        col = palette(T)[i % 5]
+        g = [f'<rect x="{x - nw / 2}" y="{y - nh / 2}" width="{nw}" height="{nh}" rx="22" fill="{T["soft"]}" stroke="{col}" stroke-width="5"/>']
+        if it.icon:
+            lines = wrap(it.label, 28, nw - 100, 2)
+            g.append(icon(x - nw / 2 + 46, y, it.icon, 60, col))
+            g.append(multiline(x - nw / 2 + 86, y + 10 - (16 if len(lines) > 1 else 0), lines, 28, T["ink"], anchor="start", lh=1.15))
+        else:
+            lines = wrap(it.label, 32, nw - 30, 2)
+            g.append(multiline(x, y + 11 - (18 if len(lines) > 1 else 0), lines, 32, T["ink"], anchor="middle", lh=1.15))
+        p.append(f'<g id="fn{i}">{"".join(g)}</g>')
+        a.append({"sel": f"#fn{i}", "fx": "pop", "dur": 0.55, "cue": cue(it)})
+    for j, c in enumerate(s.connections[:10]):
+        if not (0 <= c.source < n and 0 <= c.to < n) or c.source == c.to:
+            continue
+        (x1, y1), (x2, y2) = pos[c.source], pos[c.to]
+        dx, dy = x2 - x1, y2 - y1
+        # clip to node rectangles
+        def edge(px, py, dx, dy):
+            if abs(dx) * nh > abs(dy) * nw:
+                k = (nw / 2 + 8) / abs(dx)
+            else:
+                k = (nh / 2 + 8) / abs(dy or 1)
+            return px + dx * k, py + dy * k
+        ax, ay = edge(x1, y1, dx, dy)
+        bx, by = edge(x2, y2, -dx, -dy)
+        same_row = abs(y1 - y2) < 1
+        adjacent = same_row and all(abs(pos[k][1] - y1) >= 1 for k in range(min(c.source, c.to) + 1, max(c.source, c.to)))
+        curve = 0 if (adjacent or not same_row) else -2 * (nh / 2 + 55)  # quadratic apex = control offset / 2
+        p.append(arrow(ax, ay, bx, by, T["accent"], id=f"fc{j}", width=5, curve=curve))
+        a.append({"sel": f"#fc{j}", "fx": "draw", "dur": 0.55, "cue": c.cue})
+        if c.label:
+            L = math.hypot(dx, dy) or 1
+            nxv, nyv = -dy / L, dx / L
+            mx, my = (ax + bx) / 2, (ay + by) / 2
+            if curve:
+                mx += nxv * (curve / 2 + (-22 if curve < 0 else 22))
+                my += nyv * (curve / 2 + (-22 if curve < 0 else 22))
+            else:
+                my -= 22 if same_row else 0
+                mx += 0 if same_row else 60
+            tw = len(c.label) * 26 * CHAR_W + 20
+            p.append(f'<g id="fl{j}"><rect x="{mx - tw / 2}" y="{my - 22}" width="{tw}" height="32" rx="8" fill="#ffffff"/>'
+                     f'{text(mx, my + 2, c.label, 26, T["accent"], anchor="middle")}</g>')
+            a.append({"sel": f"#fl{j}", "fx": "fade", "dur": 0.4, "rel": 0.3})
+    return "".join(p), _clean(a)
+
+
+def t_compare(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    items = (s.items + [Item(), Item()])[:2]
+    cols = [T["primary"], T["accent"]]
+    for i, it in enumerate(items):
+        x = 60 if i == 0 else 670
+        col = cols[i]
+        g = [f'<rect x="{x}" y="200" width="550" height="480" rx="28" fill="#ffffff" stroke="{col}" stroke-width="6"/>']
+        cx = x + 275
+        if it.icon:
+            g.append(icon(cx, 290, it.icon, 120, col))
+        g.append(text(cx, 400, it.label or "", 48, col, anchor="middle", maxw=500, bold=True))
+        p.append(f'<g id="cp{i}">{"".join(g)}</g>')
+        a.append({"sel": f"#cp{i}", "fx": "pop", "dur": 0.6, "cue": cue(it)})
+        pts = [t.strip() for t in (it.caption or "").split(";") if t.strip()][:3]
+        for k, pt in enumerate(pts):
+            y = 455 + k * 62
+            p.append(f'<g id="cb{i}{k}"><circle cx="{x + 48}" cy="{y - 10}" r="7" fill="{col}"/>'
+                     f'{text(x + 70, y, pt, 30, T["ink"], maxw=450)}</g>')
+            a.append({"sel": f"#cb{i}{k}", "fx": "wipe", "dur": 0.6, "rel": 0.35 if k == 0 else 0.45})
+    p.append(f'<g id="vs"><circle cx="640" cy="440" r="46" fill="{T["bad"]}" stroke="{T["ink"]}" stroke-width="4"/>'
+             f'{text(640, 456, "VS", 40, "#ffffff", anchor="middle", bold=True)}</g>')
+    a.insert(len([x for x in a if x["sel"] in ("#hd", "#sub")]) + 1, {"sel": "#vs", "fx": "pop", "dur": 0.5, "rel": 0.3})
+    return "".join(p), _clean(a)
+
+
+def t_callout(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    it = s.items[0] if s.items else Item(label=s.heading or "")
+    warn = (it.icon or "") in ("warning", "cross", "sad", "chart-down")
+    fill, stroke = ("#fdecec", T["bad"]) if warn else (T["soft"], T["primary"])
+    y0 = 230 if s.heading else 190
+    bh = 320
+    y0 = y0 + (470 - bh) / 2 if s.heading else 200
+    p.append(f'<rect id="box" x="80" y="{y0}" width="1120" height="{bh}" rx="30" fill="{fill}" stroke="{stroke}" stroke-width="6"/>')
+    a.append({"sel": "#box", "fx": "pop", "dur": 0.6, "cue": cue(it), "rel": None if cue(it) else 0.4})
+    tx = 150
+    if it.icon:
+        p.append(icon(230, y0 + bh / 2, it.icon, 170, stroke, id="cic"))
+        a.append({"sel": "#cic", "fx": "pop", "dur": 0.6, "rel": 0.3})
+        tx = 380
+    lab = wrap(it.label, 52, 1180 - tx, 2)
+    cap = wrap(it.caption, 34, 1180 - tx, 3)
+    total = len(lab) * 52 * 1.2 + (len(cap) * 34 * 1.3 + 20 if cap else 0)
+    y = y0 + bh / 2 - total / 2 + 44
+    p.append(multiline(tx, y, lab, 52, stroke, id="clab", bold=True, lh=1.2))
+    a.append({"sel": "#clab", "fx": "wipe", "dur": 1.0, "rel": 0.3})
+    if cap:
+        p.append(multiline(tx, y + len(lab) * 52 * 1.2 + 24, cap, 34, T["ink"], id="ccap", lh=1.3))
+        a.append({"sel": "#ccap", "fx": "wipe", "dur": 1.2, "rel": 0.6})
+    return "".join(p), _clean(a)
+
+
+FORBIDDEN = re.compile(r"<(script|foreignObject|style|iframe|image|use)\b|href\s*=\s*\"\s*(https?:|javascript:)", re.I)
+
+
+def t_diagram(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = heading(s, T)
+    frag = (s.svg or "").strip()
+    frag = re.sub(r"^<\?xml[^>]*>", "", frag).strip()
+    frag = re.sub(r"^<svg[^>]*>|</svg>\s*$", "", frag).strip()
+    if not frag or FORBIDDEN.search(frag) or not _xml_ok(frag):
+        return t_list(Scene(type="list", narration=s.narration, heading=s.heading, subheading=s.subheading, items=s.items or [Item(label=s.heading or "")]), T)
+    cues: list[str] = []
+
+    def tag(m):
+        cues.append(m.group(1))
+        return f'<g id="dg{len(cues) - 1}" data-cue="{m.group(1)}"'
+
+    frag = re.sub(r'<g\s+data-cue="([^"]*)"', tag, frag)
+    # the player scales whatever the LLM drew into the 1100x480 content box, whatever coordinate range it used
+    p.append(f'<g transform="translate(640,445)"><g data-fit="1100 470"><g id="diag">{frag}</g></g></g>')
+    if cues:
+        for i, c in enumerate(cues):
+            a.append({"sel": f"#dg{i}", "fx": "draw", "dur": 0.9, "cue": c})
+    else:
+        a.append({"sel": "#diag", "fx": "draw", "dur": 2.5, "rel": 0.5})
+    return "".join(p), _clean(a)
+
+
+def t_outro(s: Scene, T) -> tuple[str, list[dict]]:
+    p, a = [], []
+    lines = wrap(s.heading or "", 76, 1120, 2)
+    p.append(multiline(W / 2, 250, lines, 76, T["primary"], id="hd", anchor="middle", lh=1.15, bold=True))
+    a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
+    uy = 250 + (len(lines) - 1) * 88 + 44
+    p.append(f'<path id="ul" d="M{W / 2 - 300},{uy} C{W / 2 - 150},{uy - 8} {W / 2 + 150},{uy + 8} {W / 2 + 300},{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="8" stroke-linecap="round"/>')
+    a.append({"sel": "#ul", "fx": "draw", "dur": 0.7, "rel": 1.0})
+    items = s.items[:3]
+    n = len(items)
+    if n:
+        pw = min(360, (1160 - 30 * (n - 1)) / n)
+        x0 = (W - (pw * n + 30 * (n - 1))) / 2
+        for i, it in enumerate(items):
+            x = x0 + i * (pw + 30)
+            col = palette(T)[i % 5]
+            g = [f'<rect x="{x}" y="440" width="{pw}" height="120" rx="60" fill="#ffffff" stroke="{col}" stroke-width="5"/>']
+            if it.icon:
+                g.append(icon(x + 62, 500, it.icon, 64, col))
+            g.append(multiline(x + (110 if it.icon else pw / 2), 510 - (12 if len(wrap(it.label, 32, pw - 130, 2)) > 1 else 0),
+                               wrap(it.label, 32, pw - (130 if it.icon else 40), 2), 32, T["ink"], anchor="start" if it.icon else "middle"))
+            p.append(f'<g id="rp{i}">{"".join(g)}</g>')
+            a.append({"sel": f"#rp{i}", "fx": "pop", "dur": 0.55, "cue": cue(it)})
+    return "".join(p), _clean(a)
+
+
+TEMPLATES = {
+    "title": t_title, "concept": t_concept, "cards": t_cards, "bars": t_bars, "steps": t_steps, "list": t_list,
+    "stat": t_stat, "flow": t_flow, "compare": t_compare, "callout": t_callout, "diagram": t_diagram, "outro": t_outro,
+}
+
+
+def render_scene(scene: Scene, T: dict) -> tuple[str, list[dict]]:
+    fn = TEMPLATES.get(scene.type, t_list)
+    return fn(scene, T)
+
+
+def _clean(anims: list[dict]) -> list[dict]:
+    out = []
+    for a in anims:
+        a = {k: v for k, v in a.items() if v is not None}
+        out.append(a)
+    return out
+
+
+def _xml_ok(frag: str) -> bool:
+    import xml.etree.ElementTree as ET
+    try:
+        ET.fromstring(f'<svg xmlns="http://www.w3.org/2000/svg">{frag}</svg>')
+        return True
+    except ET.ParseError:
+        return False

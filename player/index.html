@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>SVG scene player</title>
+<style>
+  @font-face { font-family: "Hand"; src: url("../fonts/PatrickHand.ttf"); }
+  @font-face { font-family: "Script"; src: url("../fonts/Caveat.ttf"); }
+  html, body { margin: 0; background: #fdfcfa; overflow: hidden; }
+  svg { display: block; width: 1280px; height: 720px; }
+  text { font-family: "Hand", "Marker Felt", "Bradley Hand", cursive; }
+  text.script { font-family: "Script", "Hand", cursive; }
+</style>
+</head>
+<body>
+<svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <defs>
+    <filter id="wobble" x="-2%" y="-2%" width="104%" height="104%">
+      <feTurbulence id="wobble-noise" type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="1" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <g id="scene-defs"></g>
+  </defs>
+  <rect id="bg" width="1280" height="720" fill="#fdfcfa"/>
+  <g id="camera"><g id="scene" filter="url(#wobble)"></g></g>
+</svg>
+<script src="player.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <g transform="translate(200,640) scale(1.1)"><g id="person" data-include="person"/></g>
+  <text id="lbl-b" x="200" y="695" font-size="42" fill="#222" text-anchor="middle">Borrower</text>
+
+  <g transform="translate(1030,640) scale(1.25)"><g id="bank" data-include="bank"/></g>
+  <text id="lbl-l" x="1030" y="695" font-size="42" fill="#222" text-anchor="middle">Lender (a bank)</text>
+
+  <g transform="translate(450,640) scale(1.1)"><g id="bag" data-include="moneybag"/></g>
+  <text id="lbl-now" x="450" y="470" font-size="44" fill="#1f4aa8" text-anchor="middle">Money now</text>
+
+  <g class="arr" id="payback" fill="none" stroke="#e08a1e" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300,330 C470,210 740,200 880,300"/>
+    <path d="M-20,-14 L0,0 L-20,14" transform="translate(886,306) rotate(38)"/>
+  </g>
+  <text id="lbl-back" x="580" y="190" font-size="50" fill="#e08a1e" text-anchor="middle">Pay back later, plus a little extra</text>
+  <text id="title" x="60" y="95" font-size="64" fill="#1f4aa8">A loan = borrowed money</text>
+</svg>

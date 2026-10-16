@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <g transform="translate(520,470) scale(.8)">
+    <g id="soil" data-include="soil"/>
+    <g id="plant" data-include="plant"/>
+  </g>
+
+  <!-- droplets in the soil -->
+  <g id="soil-drops" fill="#3b6fe0" stroke="#1e3fa0" stroke-width="2.5" stroke-linejoin="round">
+    <g transform="translate(335,532)"><path class="sd" d="M0,-14 C9,-3 11,5 0,11 C-11,5 -9,-3 0,-14 Z"/></g>
+    <g transform="translate(372,586)"><path class="sd" d="M0,-14 C9,-3 11,5 0,11 C-11,5 -9,-3 0,-14 Z"/></g>
+    <g transform="translate(318,500)"><path class="sd" d="M0,-14 C9,-3 11,5 0,11 C-11,5 -9,-3 0,-14 Z"/></g>
+    <g transform="translate(705,535)"><path class="sd" d="M0,-14 C9,-3 11,5 0,11 C-11,5 -9,-3 0,-14 Z"/></g>
+    <g transform="translate(668,590)"><path class="sd" d="M0,-14 C9,-3 11,5 0,11 C-11,5 -9,-3 0,-14 Z"/></g>
+    <g transform="translate(724,500)"><path class="sd" d="M0,-14 C9,-3 11,5 0,11 C-11,5 -9,-3 0,-14 Z"/></g>
+  </g>
+  <!-- arrows: soil -> roots -->
+  <g class="arr" id="arr-l" fill="none" stroke="#2f5bd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M350,598 C365,585 380,572 392,558"/>
+    <path d="M-18,-12 L0,0 L-18,12" transform="translate(396,553) rotate(-50)"/>
+  </g>
+  <g class="arr" id="arr-r" fill="none" stroke="#2f5bd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M690,603 C678,590 666,577 655,562"/>
+    <path d="M-18,-12 L0,0 L-18,12" transform="translate(651,557) rotate(230)"/>
+  </g>
+
+  <!-- droplets climbing the stem -->
+  <g id="stem-drops" fill="#3b6fe0" stroke="#fff" stroke-width="2.5" stroke-linejoin="round">
+    <g transform="translate(520,440)"><path class="dr" d="M0,-13 C9,-2 11,6 0,12 C-11,6 -9,-2 0,-13 Z"/></g>
+    <g transform="translate(521,405)"><path class="dr" d="M0,-13 C9,-2 11,6 0,12 C-11,6 -9,-2 0,-13 Z"/></g>
+    <g transform="translate(522,370)"><path class="dr" d="M0,-13 C9,-2 11,6 0,12 C-11,6 -9,-2 0,-13 Z"/></g>
+    <g transform="translate(522,335)"><path class="dr" d="M0,-13 C9,-2 11,6 0,12 C-11,6 -9,-2 0,-13 Z"/></g>
+    <g transform="translate(521,300)"><path class="dr" d="M0,-13 C9,-2 11,6 0,12 C-11,6 -9,-2 0,-13 Z"/></g>
+    <g transform="translate(520,262)"><path class="dr" d="M0,-13 C9,-2 11,6 0,12 C-11,6 -9,-2 0,-13 Z"/></g>
+  </g>
+
+  <text id="t1" x="830" y="250" font-size="56" fill="#2f5bd8">Roots absorb</text>
+  <text id="t2" x="830" y="320" font-size="56" fill="#2f5bd8">water</text>
+  <text id="h2o" x="830" y="440" font-size="110" fill="#2f5bd8">H<tspan dy="22" font-size="70">2</tspan><tspan dy="-22">O</tspan></text>
+  <text id="t3" x="70" y="200" font-size="48" fill="#222">…and carry it</text>
+  <text id="t4" x="70" y="262" font-size="48" fill="#222">up to the leaves</text>
+</svg>
