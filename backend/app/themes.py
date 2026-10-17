@@ -83,14 +83,14 @@ STYLES = {
     "hand-vector": "Clean monoline vector icon illustration: single-weight dark navy outlines, minimal muted fills (navy, slate blue, white), geometric, lots of white space, modern infographic style.",
     "bold-marker": "Bold thick marker illustration: heavy black outlines, saturated poster colours (red, yellow, blue, green), chunky shapes, energetic, highlighter-style accents.",
     "chalkboard": "Chalk drawing on a dark green chalkboard: white and pastel chalk strokes (cream, soft yellow, mint), slightly dusty and grainy, textured chalk shading, classroom feel.",
-    "editorial-monochrome": "Fine black ink and graphite editorial illustration in the manner of a premium broadsheet newspaper feature: realistic, well-proportioned people with warm natural expressions, rendered with dense fine parallel hatching and crosshatching, crisp confident contour lines and subtle tonal gradations. Strictly neutral monochrome — black, cool greys and white, absolutely no sepia or colour tint — on plain warm off-white paper. Figures are three-quarter length and fade softly into the paper at the bottom like an unfinished vignette, with generous empty paper around them. No background scenery. Short realistic text on device screens or signs is fine where natural.",
+    "editorial-monochrome": "Fine black ink and graphite editorial illustration in the manner of a premium broadsheet newspaper feature: realistic, well-proportioned people with warm natural expressions, rendered with dense fine parallel hatching and crosshatching, crisp confident contour lines, DEEP rich blacks and strong contrast — dense dark hatching in the shadows, clothing and hair, bright paper left for highlights — so the drawing reads bold and finished, never faint or pale. Strictly neutral monochrome — black, cool greys and white, absolutely no sepia or colour tint — on plain pure white paper. Figures are three-quarter length and fade softly into the paper at the bottom like an unfinished vignette, with generous empty paper around them. No background scenery. Short realistic text on device screens or signs is fine where natural.",
     "voxel-arcade": "16-bit pixel art sprite: chunky visible pixels, crisp edges, limited palette (cobalt blue, yellow, orange, mint, white), retro arcade game style.",
     "retro-mint": "Mid-century retro illustration: mint green, mustard yellow, burnt orange and dark teal, flat textured shapes, slight print grain, label-box poster style from the 1950s.",
     "documentary-blueprint": "Technical blueprint drawing: thin white and pale blue line work, dashed construction lines and dimension marks, drafting style on deep blueprint blue.",
     "neon": "Neon sign illustration: glowing tube-light strokes in electric green, cyan and magenta on black, soft outer glow, minimal filled shapes.",
     "doodle-color-pop": "Playful colourful doodle illustration: loose hand-drawn lines, bright pop colours (pink, yellow, cyan, orange), motion lines, sparkles and stars, fun and energetic.",
     "notebook": "Blue ballpoint pen sketch with coloured pencil shading, drawn directly on plain cream paper: confident ink outlines, loose hatching, a few highlighter-yellow and red-pen accents, charming student-notebook doodle feel, lots of empty paper around the subject.",
-    "pencil": "Soft graphite pencil sketch: grey tones only, gentle shading and hatching, visible pencil texture, no colour, sketchbook style.",
+    "pencil": "Graphite pencil sketch with a full tonal range: dark 6B shadows and crisp HB contours, confident hatching, visible pencil texture, no colour, sketchbook style on pure white paper.",
     "marker": "Black whiteboard marker drawing: pure black ink strokes on white, no colour, confident hand-drawn lines, light grey hatching for shadows.",
 }
 for _n in ("ocean", "forest", "sunset", "berry", "slate"):
@@ -99,8 +99,8 @@ for _n in ("ocean", "forest", "sunset", "berry", "slate"):
 # Per-theme image generation options: opaque paper (feathered into the theme bg) vs transparent cutout; quality tier;
 # whether short text on screens/signs is allowed in the picture.
 IMAGE_OPTS = {
-    "editorial-monochrome": dict(background="opaque", paper="#f7f4ee", quality="high", screen_text=True, feather=True),
-    "pencil": dict(background="opaque", paper="#fafafa", quality="medium", screen_text=False, feather=True),
+    "editorial-monochrome": dict(background="opaque", paper="#ffffff", quality="high", screen_text=True, feather=True),
+    "pencil": dict(background="opaque", paper="#ffffff", quality="medium", screen_text=False, feather=True),
     "notebook": dict(background="opaque", paper="#ffffff", quality="medium", screen_text=False, feather=True),
 }
 DEFAULT_IMAGE_OPTS = dict(background="transparent", paper=None, quality=None, screen_text=False, feather=False)

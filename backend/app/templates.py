@@ -609,7 +609,7 @@ def illus(x, y, w, h, url, *, id="illus", feather=False) -> str:
     feather=True: the image is multiply-blended (paper whites disappear into the theme background) and its edges are
     softened with a blurred mask so an opaque paper image melts into the page."""
     img = (f'<image href="{esc(url)}" x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{h:.0f}" '
-           f'preserveAspectRatio="xMidYMid meet"{" style=\"mix-blend-mode:multiply;filter:brightness(1.06) contrast(1.04)\"" if feather else ""}/>')
+           f'preserveAspectRatio="xMidYMid meet"{" style=\"mix-blend-mode:multiply;filter:contrast(1.28) saturate(0)\"" if feather else ""}/>')
     if not feather:
         return img.replace("<image ", f'<image id="{id}" ', 1)
     mid = f"m{id}"
