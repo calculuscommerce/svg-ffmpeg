@@ -83,7 +83,7 @@ STYLES = {
     "hand-vector": "Clean monoline vector icon illustration: single-weight dark navy outlines, minimal muted fills (navy, slate blue, white), geometric, lots of white space, modern infographic style.",
     "bold-marker": "Bold thick marker illustration: heavy black outlines, saturated poster colours (red, yellow, blue, green), chunky shapes, energetic, highlighter-style accents.",
     "chalkboard": "Chalk drawing on a dark green chalkboard: white and pastel chalk strokes (cream, soft yellow, mint), slightly dusty and grainy, textured chalk shading, classroom feel.",
-    "editorial-monochrome": "Highly detailed realistic graphite pencil and fine-liner illustration in the style of a premium newspaper or magazine editorial: realistic people with natural proportions, expressive faces and hands, dense fine crosshatching and tonal shading, rich greys with no colour at all, drawn on plain warm cream paper. The figures and objects fade softly into the paper towards the bottom edge, like an unfinished vignette. Any device screens or signs in the picture may show short, clean, legible labels where natural.",
+    "editorial-monochrome": "Fine black ink and graphite editorial illustration in the manner of a premium broadsheet newspaper feature: realistic, well-proportioned people with warm natural expressions, rendered with dense fine parallel hatching and crosshatching, crisp confident contour lines and subtle tonal gradations. Strictly neutral monochrome — black, cool greys and white, absolutely no sepia or colour tint — on plain warm off-white paper. Figures are three-quarter length and fade softly into the paper at the bottom like an unfinished vignette, with generous empty paper around them. No background scenery. Short realistic text on device screens or signs is fine where natural.",
     "voxel-arcade": "16-bit pixel art sprite: chunky visible pixels, crisp edges, limited palette (cobalt blue, yellow, orange, mint, white), retro arcade game style.",
     "retro-mint": "Mid-century retro illustration: mint green, mustard yellow, burnt orange and dark teal, flat textured shapes, slight print grain, label-box poster style from the 1950s.",
     "documentary-blueprint": "Technical blueprint drawing: thin white and pale blue line work, dashed construction lines and dimension marks, drafting style on deep blueprint blue.",
@@ -154,7 +154,7 @@ def player_theme(T: dict) -> dict:
 
 # One fixed demo scene rendered in every theme for the gallery thumbnails.
 DEMO_SCENE = Scene(
-    type="steps", illustration="A glowing lightbulb, an open notebook with a pencil, and a video player screen with a play button, arranged left to right and connected by chunky arrows", narration="You start with an idea, turn it into a script, and it becomes a video you can share.",
+    type="steps", illustration="A young creator sits at a desk sketching ideas in an open notebook, a glowing lightbulb floating above their head, and a laptop beside them showing a video player with a play button", narration="You start with an idea, turn it into a script, and it becomes a video you can share.",
     heading="How ideas become videos",
     items=[Item(icon="lightbulb", label="Idea", caption="Spark it", cue="idea"),
            Item(icon="document", label="Script", caption="Write it down", cue="script"),
