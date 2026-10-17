@@ -26,7 +26,6 @@ renderer/render.mjs   spec.json -> MP4 (parallel scene rendering, progress on st
 player/          deterministic SVG timeline player (seek(t)); effects: wipe, draw, pop, grow, slide, count, scalex, bob, spin, pulse…
 lib/parts.svg    asset library: illustrations + ~100 icons, theme-tinted via currentColor
 fonts/           Patrick Hand, Caveat
-src/build.mjs    legacy CLI: hand-written storyboards/*.json -> MP4 using macOS `say`
 ```
 
 ## API
