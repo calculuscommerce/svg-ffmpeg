@@ -10,7 +10,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import compose, images, llm, tts
+from . import compose, images, ledger, llm, tts
 from .models import CreateProject, Storyboard
 from .templates import ILLUSTRATED
 from .themes import player_theme, theme as get_theme
@@ -39,9 +39,9 @@ class Store:
         d.mkdir(parents=True, exist_ok=True)
         (d / "project.json").write_text(json.dumps(p, ensure_ascii=False, indent=1))
 
-    def create(self, inp: CreateProject, storyboard: Storyboard | None = None) -> dict:
+    def create(self, inp: CreateProject, storyboard: Storyboard | None = None, rerender_of: str | None = None) -> dict:
         pid = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
-        p = {
+        p = {"rerender_of": rerender_of, "ledger": [], "usage": None,
             "id": pid, "created_at": time.time(), "input": inp.model_dump(), "status": "queued", "progress": 0,
             "message": "Waiting in queue", "storyboard": storyboard.model_dump(by_alias=True) if storyboard else None,
             "scenes": [], "video_url": None, "captions_url": None, "duration": None, "error": None, "log": [],
@@ -82,6 +82,7 @@ async def worker():
             try:
                 await run(p)
             except Exception as e:  # noqa: BLE001
+                p["usage"] = ledger.project_summary(p)
                 _update(p, status="error", error=str(e)[:1000], message=f"Failed: {str(e)[:200]}")
         queue.task_done()
 
@@ -97,7 +98,11 @@ async def run(p: dict):
         _update(p, status="writing", progress=8, message="Using edited storyboard")
     else:
         _update(p, status="writing", progress=3, message="Writing the script and storyboard…")
-        sb = await llm.generate_storyboard(inp.prompt, inp.duration, inp.language, inp.theme, script=inp.script if inp.mode == "script" else None)
+        u: dict = {}
+        sb = await llm.generate_storyboard(inp.prompt, inp.duration, inp.language, inp.theme, script=inp.script if inp.mode == "script" else None, usage=u)
+        ledger.record(p, "openai", "storyboard", u.get("input_tokens", 0) + u.get("output_tokens", 0), "tokens",
+                      ledger.cost_llm("gpt-4.1", u.get("input_tokens", 0), u.get("output_tokens", 0)),
+                      model=os.environ.get("OPENAI_MODEL", "gpt-4.1"), input_tokens=u.get("input_tokens", 0), output_tokens=u.get("output_tokens", 0), calls=u.get("calls", 1))
         _update(p, storyboard=sb.model_dump(by_alias=True), title=sb.title, progress=12,
                 message=f"Storyboard ready: {len(sb.scenes)} scenes")
 
@@ -114,6 +119,7 @@ async def run(p: dict):
         async with sem:
             mp3 = pdir / f"voice_{i}.mp3"
             words = await tts.synthesize(sc.narration, voice, str(mp3))
+            ledger.record(p, "elevenlabs", "tts", len(sc.narration), "chars", ledger.cost_tts(len(sc.narration)), scene=i, model=os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2"))
             done += 1
             _update(p, progress=14 + int(22 * done / len(sb.scenes)), message=f"Voice-over {done}/{len(sb.scenes)}")
             return str(mp3), words, _probe(str(mp3))
@@ -121,17 +127,28 @@ async def run(p: dict):
     async def illustrate(i, sc):
         if inp.visuals != "illustrated" or T.get("no_images") or not sc.illustration or sc.type not in ILLUSTRATED:
             return None  # data-only layouts (bars, stat, flow, compare, diagram) don't place art; skip the cost
-        out = await images.generate(sb.theme, sc.illustration, pdir / f"illus_{i}.png")
+        info: dict = {}
+        out = await images.generate(sb.theme, sc.illustration, pdir / f"illus_{i}.png", info=info)
         if out:
-            p["log"].append({"t": time.time(), "m": f"Illustration {i + 1} ready"})
+            if info.get("cached"):
+                ledger.record(p, "openai", "image-cached", 1, "images", 0.0, scene=i, quality=info.get("quality"))
+            else:
+                ledger.record(p, "openai", "image", 1, "images", ledger.cost_image(info.get("output_tokens", 0), info.get("input_tokens", 0)),
+                              scene=i, quality=info.get("quality"), output_tokens=info.get("output_tokens", 0), model=os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-1"))
+            p["log"].append({"t": time.time(), "m": f"Illustration {i + 1} ready" + (" (cached)" if info.get("cached") else "")})
         return f"/data/projects/{p['id']}/illus_{i}.png" if out else None
 
     if inp.visuals == "illustrated":
         _update(p, message="Generating the voice-over and illustrations…")
+    # run voice and images together; if voicing fails, still let the images finish so their cost is recorded
     voiced, illus_urls = await asyncio.gather(
         asyncio.gather(*(voice_one(i, sc) for i, sc in enumerate(sb.scenes))),
-        asyncio.gather(*(illustrate(i, sc) for i, sc in enumerate(sb.scenes))),
+        asyncio.gather(*(illustrate(i, sc) for i, sc in enumerate(sb.scenes)), return_exceptions=True),
+        return_exceptions=True,
     )
+    if isinstance(voiced, BaseException):
+        raise voiced
+    illus_urls = [None if isinstance(u, BaseException) else u for u in illus_urls]
 
     # 3. compose
     _update(p, status="composing", progress=38, message="Laying out scenes and syncing animation…")
@@ -185,8 +202,13 @@ async def run(p: dict):
         err = (await proc.stderr.read()).decode()[-1500:]
         raise RuntimeError(f"renderer failed: {err}")
     shutil.rmtree(pdir / ".render", ignore_errors=True)
+    final_dur = round(_probe(str(out)), 1)
+    ledger.record(p, "render", "frames", final_dur / 60.0, "video-minutes", ledger.cost_render(final_dur), frames=total_frames, fps=spec["fps"], scale=spec["scale"])
+    credits = ledger.video_credits(inp.duration, sb.theme, rerender=bool(p.get("rerender_of")))
+    ledger.record(p, "credits", "charge", credits, "credits", 0.0, theme=sb.theme, duration_target=inp.duration, rerender=bool(p.get("rerender_of")))
+    p["usage"] = ledger.project_summary(p)
     _update(p, status="done", progress=100, message="Done", video_url=f"/media/{p['id']}/video.mp4",
-            captions_url=f"/media/{p['id']}/captions.srt", duration=round(_probe(str(out)), 1))
+            captions_url=f"/media/{p['id']}/captions.srt", duration=final_dur)
 
 
 _voice_cache: dict = {}

@@ -44,9 +44,12 @@ def cache_path(theme_name: str, brief: str) -> Path:
     return CACHE / f"{key}.png"
 
 
-async def generate(theme_name: str, brief: str, dest: Path, *, quality: str | None = None) -> Path | None:
-    """Generate (or reuse) the illustration and copy it to dest. Returns None on failure (caller falls back)."""
+async def generate(theme_name: str, brief: str, dest: Path, *, quality: str | None = None, info: dict | None = None) -> Path | None:
+    """Generate (or reuse) the illustration and copy it to dest. Returns None on failure (caller falls back).
+    info (optional dict) receives {cached, quality, output_tokens, input_tokens}."""
     cp = cache_path(theme_name, brief)
+    if info is not None:
+        info.update(cached=cp.exists(), quality=quality or opts_for(theme_name).get("quality") or os.environ.get("OPENAI_IMAGE_QUALITY", "medium"), output_tokens=0, input_tokens=0)
     if not cp.exists():
         client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
         o = opts_for(theme_name)
@@ -59,6 +62,9 @@ async def generate(theme_name: str, brief: str, dest: Path, *, quality: str | No
                                                      prompt=prompt_for(theme_name, brief), size="1536x1024",
                                                      quality=q, background=o["background"], output_format="png")
                 cp.write_bytes(base64.b64decode(r.data[0].b64_json))
+                if info is not None and getattr(r, "usage", None):
+                    info["output_tokens"] = getattr(r.usage, "output_tokens", 0) or 0
+                    info["input_tokens"] = getattr(r.usage, "input_tokens", 0) or 0
                 break
             except Exception as e:  # noqa: BLE001
                 last = e

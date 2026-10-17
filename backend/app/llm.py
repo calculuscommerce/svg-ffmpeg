@@ -114,7 +114,8 @@ The user has written the narration themselves. You are the director, not the wri
 
 
 async def generate_storyboard(prompt: str, duration: int, language: str = "English", theme: str = "auto",
-                              script: str | None = None) -> Storyboard:
+                              script: str | None = None, usage: dict | None = None) -> Storyboard:
+    """usage (optional dict) is filled with accumulated input/output token counts across attempts."""
     client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
     model = os.environ.get("OPENAI_MODEL", "gpt-4.1")
     system = _system(duration, language)
@@ -134,6 +135,10 @@ async def generate_storyboard(prompt: str, duration: int, language: str = "Engli
             model=model, messages=messages, temperature=0.7, response_format={"type": "json_object"},
         )
         txt = resp.choices[0].message.content or ""
+        if usage is not None and resp.usage:
+            usage["input_tokens"] = usage.get("input_tokens", 0) + resp.usage.prompt_tokens
+            usage["output_tokens"] = usage.get("output_tokens", 0) + resp.usage.completion_tokens
+            usage["calls"] = usage.get("calls", 0) + 1
         try:
             data = json.loads(txt)
             sb = Storyboard.model_validate(data)

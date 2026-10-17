@@ -194,3 +194,22 @@ select.pill { cursor: pointer; }
 .play { border: 1px solid var(--line); background: #fff; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; flex: none; }
 .play.on { background: var(--primary); color: #fff; border-color: var(--primary); }
 @media (max-width: 900px) { .theme-strip, .theme-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ---- usage ---- */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+.kpi-v { font-size: 28px; font-weight: 700; }
+.kpi-l { font-size: 13px; color: var(--muted); }
+.tbl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+.tbl th, .tbl td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.tbl th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl.small { font-size: 13px; }
+.tbl tfoot td { border-bottom: 0; }
+.bars { display: flex; align-items: flex-end; gap: 6px; height: 180px; margin-top: 14px; }
+.barcol { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.barfill { width: 100%; background: linear-gradient(180deg, var(--primary), var(--accent)); border-radius: 4px 4px 0 0; }
+.barlbl { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.btn.on { border-color: var(--primary); color: var(--primary); }
+.cost h2 { margin: 0; }
+@media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } }

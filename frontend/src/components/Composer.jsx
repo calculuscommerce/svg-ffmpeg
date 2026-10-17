@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../api.js";
 import { ThemeModal, ThemeStrip } from "./ThemePicker.jsx";
 import VoicePicker from "./VoicePicker.jsx";
 
@@ -31,6 +32,8 @@ export default function Composer({ voices, themes, onCreate }) {
   const [showThemes, setShowThemes] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [est, setEst] = useState(null);
+  useEffect(() => { api.estimate({ duration, theme, visuals }).then(setEst).catch(() => setEst(null)); }, [duration, theme, visuals]);
 
   const dur = DURATIONS.find((d) => d.v === duration);
   const scriptWords = script.trim().split(/\s+/).filter(Boolean).length;
@@ -112,7 +115,10 @@ export default function Composer({ voices, themes, onCreate }) {
 
         {err && <div className="banner error">{err}</div>}
         <div className="row between top">
-          <span className="small muted">Typical time: 30 s ≈ 1 min · 1 min ≈ 2 min · 5 min ≈ 10 min</span>
+          <span className="small muted">
+            {est ? <>Estimated: <b>{est.credits} credit{est.credits === 1 ? "" : "s"}</b> · ~${est.cost_total_usd.toFixed(2)} provider cost · {est.images} illustration{est.images === 1 ? "" : "s"} ({est.image_quality}) · </> : null}
+            Typical time: 30 s ≈ 1 min · 1 min ≈ 2 min · 5 min ≈ 10 min
+          </span>
           <button className="btn primary lg" disabled={busy || !ready}>{busy ? "Starting…" : "Generate video"}</button>
         </div>
       </form>

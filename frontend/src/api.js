@@ -16,5 +16,7 @@ export const api = {
   create: (body) => j("/api/projects", { method: "POST", body: JSON.stringify(body) }),
   remove: (id) => j(`/api/projects/${id}`, { method: "DELETE" }),
   retry: (id) => j(`/api/projects/${id}/retry`, { method: "POST" }),
+  usage: (days = 30) => j(`/api/usage?days=${days}`),
+  estimate: (q) => j(`/api/usage/estimate?${new URLSearchParams(q)}`),
   rerender: (id, storyboard) => j(`/api/projects/${id}/rerender`, { method: "POST", body: JSON.stringify(storyboard) }),
 };

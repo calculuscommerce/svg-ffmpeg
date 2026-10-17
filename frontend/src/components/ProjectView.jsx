@@ -148,6 +148,24 @@ export default function ProjectView({ id, onChanged, onOpen }) {
         </section>
       )}
 
+      {p.usage && Object.keys(p.usage.lines || {}).length > 0 && (
+        <div className="card top cost">
+          <div className="row between">
+            <h2>Cost of this video</h2>
+            <div className="row gap"><span className="tag big">{p.usage.credits} credits</span><b>${p.usage.cost_usd.toFixed(3)} provider cost</b></div>
+          </div>
+          <table className="tbl small">
+            <thead><tr><th>Service</th><th className="num">Calls</th><th className="num">Units</th><th className="num">Cost</th></tr></thead>
+            <tbody>
+              {Object.entries(p.usage.lines).map(([k, v]) => (
+                <tr key={k}><td>{{ "openai:storyboard": "GPT-4.1 storyboard", "openai:image": "gpt-image-1 illustrations", "openai:image-cached": "Illustrations from cache", "elevenlabs:tts": "ElevenLabs voice-over", "render:frames": "Render" }[k] || k}</td>
+                  <td className="num">{v.calls}</td><td className="num">{v.units.toLocaleString()} {v.unit}</td><td className="num">${v.cost_usd.toFixed(4)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {p.log?.length > 0 && (
         <details className="log">
           <summary className="small muted">Activity log</summary>

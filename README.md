@@ -57,6 +57,16 @@ pinching hand. The hands are vector placeholders in `lib/parts.svg` (`hand-marke
 cutouts, drop PNGs into `assets/hands/` and describe the tip pixel in `assets/hands/hands.json` (see the README there).
 The marker theme sets `mono`, which desaturates the whole scene so library icons read as ink drawings.
 
+## Usage ledger
+
+Every billable call is appended to `data/ledger.jsonl` and mirrored into the project (`backend/app/ledger.py`):
+GPT-4.1 tokens (storyboard), ElevenLabs characters (voice), each gpt-image-1 call with quality (cache hits logged at
+$0), and render minutes. Provider rates and credit rules are in `RATES` / `CREDIT_*` and overridable via env
+(`RATE_GPT41_INPUT`, `RATE_ELEVEN_PER_CHAR`, `CREDIT_PREMIUM_MULTIPLIER`, …). Credits: 1 per finished minute in a
+standard theme, 2× for premium-art themes, 0.25× for re-renders. `GET /api/usage?days=30` gives totals by service,
+theme and day; `GET /api/usage/estimate?duration=60&theme=…` powers the pre-generation estimate in the composer;
+each project carries `usage` (per-video breakdown). The UI has a **Usage & costs** page and a cost panel per video.
+
 ## Gotchas
 
 - Animated elements must not carry a `transform=""` attribute (CSS transform overrides it) — wrap them in a positioned `<g>`.

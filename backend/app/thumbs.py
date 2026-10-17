@@ -5,7 +5,7 @@ import asyncio
 import json
 from pathlib import Path
 
-from . import compose, images
+from . import compose, images, ledger
 from .themes import GALLERY, THEMES, demo_for, player_theme
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,7 +27,11 @@ async def ensure_thumbs(force: bool = False) -> None:
         if not missing:
             return
         scenes = []
-        arts = await asyncio.gather(*(images.generate(n, demo_for(n).illustration, OUT / f"{n}-art.png") if not THEMES[n].get("no_images") and demo_for(n).illustration else asyncio.sleep(0) for n in missing))
+        infos = [{} for _ in missing]
+        arts = await asyncio.gather(*(images.generate(n, demo_for(n).illustration, OUT / f"{n}-art.png", info=inf) if not THEMES[n].get("no_images") and demo_for(n).illustration else asyncio.sleep(0) for n, inf in zip(missing, infos)))
+        for n, inf in zip(missing, infos):
+            if inf and not inf.get("cached"):
+                ledger.record(None, "openai", "image", 1, "images", ledger.cost_image(inf.get("output_tokens", 0), inf.get("input_tokens", 0)), purpose="theme-thumbnail", theme=n, quality=inf.get("quality"))
         for n, art in zip(missing, arts):
             T = THEMES[n]
             sc = demo_for(n)

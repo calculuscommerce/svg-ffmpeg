@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-from . import jobs, llm, thumbs, tts  # noqa: E402
+from . import jobs, ledger, llm, thumbs, tts  # noqa: E402
 from .models import CreateProject, Storyboard  # noqa: E402
 from .themes import GALLERY, THEMES  # noqa: E402
 
@@ -32,7 +32,7 @@ app.mount("/themes", StaticFiles(directory=str(thumbs.OUT)), name="themes")
 
 
 def _summary(p: dict) -> dict:
-    return {k: p.get(k) for k in ("id", "title", "status", "progress", "message", "created_at", "duration", "video_url")} | {
+    return {k: p.get(k) for k in ("id", "title", "status", "progress", "message", "created_at", "duration", "video_url", "usage")} | {
         "input": {"duration": p["input"]["duration"], "prompt": (p["input"].get("script") or p["input"].get("prompt") or "")[:120]}}
 
 
@@ -117,6 +117,31 @@ async def rerender(pid: str, storyboard: Storyboard):
     p = jobs.store.projects.get(pid)
     if not p:
         raise HTTPException(404)
-    q = jobs.store.create(CreateProject(**p["input"]), storyboard)
+    q = jobs.store.create(CreateProject(**p["input"]), storyboard, rerender_of=pid)
     await jobs.queue.put(q["id"])
     return q
+
+
+@app.get("/api/usage")
+async def usage(days: int = 30):
+    import time
+    since = time.time() - days * 86400
+    return ledger.usage_report(since=since, projects=jobs.store.projects)
+
+
+@app.get("/api/usage/estimate")
+async def estimate(duration: int = 60, theme: str = "hand-drawn", visuals: str = "illustrated"):
+    """Pre-generation estimate shown in the composer."""
+    scenes = {30: 4, 60: 7, 300: 20}.get(duration, round(duration / 9))
+    T = THEMES.get(theme, THEMES["hand-drawn"])
+    from .themes import IMAGE_OPTS
+    q = (IMAGE_OPTS.get(theme) or {}).get("quality") or "medium"
+    img_tokens = {"low": 400, "medium": 1570, "high": 6200}.get(q, 1570)
+    n_images = 0 if (visuals != "illustrated" or T.get("no_images")) else round(scenes * 0.75)
+    chars = {30: 400, 60: 870, 300: 4100}.get(duration, duration * 14)
+    llm_cost = ledger.cost_llm("gpt-4.1", 2500, {30: 1200, 60: 2000, 300: 6000}.get(duration, duration * 20)) * 1.3
+    return {"duration": duration, "theme": theme, "scenes": scenes, "images": n_images, "image_quality": q,
+            "cost": {"openai_llm": round(llm_cost, 4), "elevenlabs": round(ledger.cost_tts(chars), 4),
+                     "openai_images": round(n_images * ledger.cost_image(img_tokens, 60), 4), "render": round(ledger.cost_render(duration * 1.1), 4)},
+            "cost_total_usd": round(llm_cost + ledger.cost_tts(chars) + n_images * ledger.cost_image(img_tokens, 60) + ledger.cost_render(duration * 1.1), 4),
+            "credits": ledger.video_credits(duration, theme)}

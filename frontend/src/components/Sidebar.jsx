@@ -8,7 +8,7 @@ function fmtAgo(ts) {
 
 const DUR = { 30: "30 s", 60: "1 min", 300: "5 min" };
 
-export default function Sidebar({ projects, selected, onSelect, onNew, onDelete }) {
+export default function Sidebar({ projects, selected, onSelect, onNew, onDelete, onUsage }) {
   return (
     <aside className="sidebar">
       <div className="brand" onClick={onNew}>
@@ -16,6 +16,7 @@ export default function Sidebar({ projects, selected, onSelect, onNew, onDelete 
         <span className="brand-name">Sketchboard</span>
       </div>
       <button className="btn primary block" onClick={onNew}>+ New video</button>
+      <button className={"btn block " + (selected === "__usage__" ? "on" : "")} onClick={onUsage}>▤ Usage & costs</button>
       <div className="side-title">Your videos</div>
       <div className="plist">
         {projects.length === 0 && <div className="muted small pad">Nothing yet. Generate your first video.</div>}
@@ -26,6 +27,7 @@ export default function Sidebar({ projects, selected, onSelect, onNew, onDelete 
               <div className="ptitle">{p.title || (p.input.prompt || "").slice(0, 48) || "Untitled"}</div>
               <div className="pmeta">
                 {DUR[p.input.duration]} · {p.status === "done" ? `${p.duration}s` : p.status === "error" ? "failed" : `${p.progress}%`} · {fmtAgo(p.created_at)}
+                {p.usage?.cost_usd != null && p.status === "done" ? ` · $${p.usage.cost_usd.toFixed(2)}` : ""}
               </div>
             </div>
             <button className="icon-btn" title="Delete" onClick={(e) => { e.stopPropagation(); onDelete(p.id); }}>×</button>

@@ -3,6 +3,7 @@ import { api } from "./api.js";
 import Composer from "./components/Composer.jsx";
 import ProjectView from "./components/ProjectView.jsx";
 import Sidebar from "./components/Sidebar.jsx";
+import UsagePage from "./components/UsagePage.jsx";
 
 export default function App() {
   const [projects, setProjects] = useState([]);
@@ -44,10 +45,12 @@ export default function App() {
 
   return (
     <div className="app">
-      <Sidebar projects={projects} selected={selected} onSelect={setSelected} onNew={() => setSelected(null)} onDelete={onDelete} />
+      <Sidebar projects={projects} selected={selected} onSelect={setSelected} onNew={() => setSelected(null)} onDelete={onDelete} onUsage={() => setSelected("__usage__")} />
       <main className="main">
         {error && <div className="banner error">{error}</div>}
-        {selected ? (
+        {selected === "__usage__" ? (
+          <UsagePage />
+        ) : selected ? (
           <ProjectView
             id={selected}
             voices={voices}
