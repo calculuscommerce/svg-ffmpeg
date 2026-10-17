@@ -154,12 +154,45 @@ def player_theme(T: dict) -> dict:
     return d
 
 
-# One fixed demo scene rendered in every theme for the gallery thumbnails.
-DEMO_SCENE = Scene(
-    type="steps", illustration="A young creator sits at a desk sketching ideas in an open notebook, a glowing lightbulb floating above their head, and a laptop beside them showing a video player with a play button", narration="You start with an idea, turn it into a script, and it becomes a video you can share.",
-    heading="How ideas become videos",
-    items=[Item(icon="lightbulb", label="Idea", caption="Spark it", cue="idea"),
-           Item(icon="document", label="Script", caption="Write it down", cue="script"),
-           Item(icon="camera", label="Video", caption="Render it", cue="video"),
-           Item(icon="megaphone", label="Share", caption="Grow", cue="share")],
-)
+# Demo scenes for the gallery thumbnails — one per theme so the gallery shows each theme's own subject matter.
+def _demo(heading, illustration, items, type="steps"):
+    return Scene(type=type, narration=" ".join(i[0] for i in items), heading=heading, illustration=illustration,
+                 items=[Item(icon=ic, label=lb, caption=cp, cue=lb) for lb, cp, ic in items])
+
+
+DEMOS = {
+    "hand-drawn": _demo("How ideas become videos", "A teacher at a whiteboard sketching a lightbulb while two students take notes",
+                        [("Idea", "Spark it", "lightbulb"), ("Script", "Write it down", "document"), ("Video", "Render it", "camera"), ("Share", "Grow", "megaphone")]),
+    "classic-whiteboard": _demo("How ideas become videos", None,
+                        [("Idea", "Spark it", "lightbulb"), ("Script", "Write it down", "document"), ("Video", "Render it", "camera"), ("Share", "Grow", "megaphone")]),
+    "hand-vector": _demo("How the cloud works", "A smartphone, a laptop and a server rack connected to a cloud by arrows",
+                        [("Request", "From your device", "phone"), ("Network", "Travels the web", "globe"), ("Server", "Does the work", "server"), ("Response", "Back to you", "arrow-down")]),
+    "bold-marker": _demo("Launch your side project", "A rocket blasting off from a laptop screen with stars and smoke",
+                        [("Idea", "Pick one", "lightbulb"), ("Build", "Ship fast", "rocket"), ("Launch", "Tell people", "megaphone"), ("Learn", "Iterate", "refresh")]),
+    "chalkboard": _demo("The water cycle", "A sun over a lake with rising vapour, a cloud and falling rain, drawn in chalk",
+                        [("Evaporation", "Sun heats water", "sun-icon"), ("Condensation", "Clouds form", "cloud"), ("Precipitation", "Rain falls", "water"), ("Collection", "Back to rivers", "earth")]),
+    "editorial-monochrome": _demo("How contactless payments work",
+                        "A customer taps a bank card on a payment terminal at a small grocery counter while the shopkeeper, wearing an apron, hands over a paper bag of fresh groceries",
+                        [("Tap", "Card meets reader", "creditcard"), ("Verify", "Bank approves", "shield"), ("Pay", "Shop is paid", "store"), ("Receipt", "Proof of sale", "document")]),
+    "voxel-arcade": _demo("Payday groceries", "A cheerful character relaxing in an armchair looking at a phone that shows a bank balance screen",
+                        [("Payday", "Money arrives", "coins"), ("Budget", "Plan the week", "calculator"), ("Shop", "Buy groceries", "cart"), ("Save", "Keep the rest", "piggybank")]),
+    "retro-mint": _demo("Brew better coffee", "A vintage coffee grinder, a kettle and a steaming cup on a kitchen counter",
+                        [("Grind", "Fresh beans", "gear"), ("Heat", "Just off the boil", "fire"), ("Pour", "Slow and steady", "coffee"), ("Enjoy", "Sip slowly", "smile")]),
+    "documentary-blueprint": _demo("Anatomy of a bicycle", "An exploded technical drawing of a bicycle showing frame, wheels, chain and gears",
+                        [("Frame", "Holds it together", "bike"), ("Drivetrain", "Pedals to wheel", "gear"), ("Brakes", "Stopping power", "shield"), ("Wheels", "Rolling contact", "refresh")]),
+    "neon": _demo("Night market sounds", "An electric guitar, a pair of headphones and a boombox glowing in neon",
+                        [("Beat", "Set the rhythm", "bolt"), ("Melody", "Hook them in", "star"), ("Drop", "Bring the energy", "fire"), ("Encore", "Leave them wanting", "megaphone")]),
+    "doodle-color-pop": _demo("Big ideas take flight", "A kid flying a rocket-shaped kite among stars and clouds",
+                        [("Dream", "Think big", "star"), ("Doodle", "Sketch it", "lightbulb"), ("Try", "Make a mess", "rocket"), ("Fly", "Share it", "plane")]),
+    "notebook": _demo("Exam week plan", "A student's desk with open textbooks, a water bottle, sticky notes and a desk lamp",
+                        [("Review", "Read notes", "book"), ("Practice", "Past papers", "document"), ("Rest", "Sleep well", "clock"), ("Exam", "Show up early", "graduation")]),
+    "pencil": _demo("Designing a house", "An architect at a drafting table sketching a house plan with a pencil and ruler",
+                        [("Brief", "Listen first", "chat"), ("Sketch", "Explore options", "house"), ("Refine", "Fix the details", "gear"), ("Build", "Make it real", "building")]),
+    "marker": _demo("How ideas become videos", "A hand holding a marker drawing a lightbulb on a whiteboard",
+                        [("Idea", "Spark it", "lightbulb"), ("Script", "Write it down", "document"), ("Video", "Render it", "camera"), ("Share", "Grow", "megaphone")]),
+}
+DEMO_SCENE = DEMOS["hand-drawn"]
+
+
+def demo_for(name: str) -> Scene:
+    return DEMOS.get(name, DEMO_SCENE)
