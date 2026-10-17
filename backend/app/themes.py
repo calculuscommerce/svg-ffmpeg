@@ -58,9 +58,10 @@ THEMES = {t["name"]: t for t in [
     _t("doodle-color-pop", "Doodle Color Pop", "Playful doodles, bright colours, lots of energy.",
        primary="#ff5d8f", secondary="#5aa9e6", accent="#ffbe0b", good="#06d6a0", bad="#ef476f", bg="#ffffff",
        font_head="caveat", font_body="hand", filter="wobble", stroke_scale=1.15),
-    _t("notebook", "Notebook", "Ruled paper, pen sketches, sticky-note colours.",
-       primary="#1f4aa8", secondary="#d1495b", accent="#f6c445", ink="#23324a", muted="#60708a", soft="#eef3ff",
-       bg="#fbfbf6", card="#fffdf0", background="notebook", filter="pencil", hand="pencil"),
+    _t("notebook", "Notebook", "Spiral notebook: blue ballpoint handwriting on ruled paper, red pen ticks, highlighter.",
+       primary="#1d4ed8", secondary="#d1495b", accent="#ffe066", good="#2e8b57", bad="#d1495b", ink="#1f2a44",
+       muted="#6b7a92", soft="#fff7bf", bg="#fbfaf3", card="#fff7bf", background="notebook", filter="wobble",
+       font_head="caveat", font_body="hand", hand="pencil"),
     _t("pencil", "Pencil", "Soft graphite sketch, greys only.",
        primary="#3a3a3a", secondary="#6a6a6a", accent="#3a3a3a", good="#3a3a3a", bad="#3a3a3a", ink="#2e2e2e",
        muted="#7a7a7a", soft="#eeeeee", bg="#fafafa", card="#ffffff", filter="pencil", mono=True, hand="pencil",
@@ -88,7 +89,7 @@ STYLES = {
     "documentary-blueprint": "Technical blueprint drawing: thin white and pale blue line work, dashed construction lines and dimension marks, drafting style on deep blueprint blue.",
     "neon": "Neon sign illustration: glowing tube-light strokes in electric green, cyan and magenta on black, soft outer glow, minimal filled shapes.",
     "doodle-color-pop": "Playful colourful doodle illustration: loose hand-drawn lines, bright pop colours (pink, yellow, cyan, orange), motion lines, sparkles and stars, fun and energetic.",
-    "notebook": "Ballpoint pen and coloured pencil sketch on ruled notebook paper: blue ink lines, light pencil shading, sticky-note yellow and red pencil accents, casual student notebook feel.",
+    "notebook": "Blue ballpoint pen sketch with coloured pencil shading, drawn directly on plain cream paper: confident ink outlines, loose hatching, a few highlighter-yellow and red-pen accents, charming student-notebook doodle feel, lots of empty paper around the subject.",
     "pencil": "Soft graphite pencil sketch: grey tones only, gentle shading and hatching, visible pencil texture, no colour, sketchbook style.",
     "marker": "Black whiteboard marker drawing: pure black ink strokes on white, no colour, confident hand-drawn lines, light grey hatching for shadows.",
 }
@@ -100,6 +101,7 @@ for _n in ("ocean", "forest", "sunset", "berry", "slate"):
 IMAGE_OPTS = {
     "editorial-monochrome": dict(background="opaque", paper="#f7f4ee", quality="high", screen_text=True, feather=True),
     "pencil": dict(background="opaque", paper="#fafafa", quality="medium", screen_text=False, feather=True),
+    "notebook": dict(background="opaque", paper="#ffffff", quality="medium", screen_text=False, feather=True),
 }
 DEFAULT_IMAGE_OPTS = dict(background="transparent", paper=None, quality=None, screen_text=False, feather=False)
 
@@ -124,7 +126,7 @@ LAYOUTS = {
     "documentary-blueprint": dict(heading="rule-double",   art="side",       items="table",     decor="corners"),
     "neon":                  dict(heading="centered-rule", art="center",     items="pills",     decor="none"),
     "doodle-color-pop":      dict(heading="underline",     art="side-right", items="bubbles",   decor="doodles"),
-    "notebook":              dict(heading="left",          art="taped-right", items="checklist", decor="sticky"),
+    "notebook":              dict(heading="ink",           art="taped-right", items="checklist", decor="sticky"),
     "pencil":                dict(heading="left",          art="taped",      items="list",      decor="none"),
     "marker":                dict(heading="underline",     art="center",     items="callouts",  decor="none"),
 }

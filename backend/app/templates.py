@@ -172,6 +172,20 @@ def heading(scene: Scene, T: dict, *, y=100, size=64) -> tuple[list[str], list[d
         parts.append(text(60, y, h, size, T["primary"], id="hd", maxw=1160, bold=True))
         parts.append(f'<g id="hdr1" fill="none" stroke="{T["primary"]}"><path d="M60,{y + 22} H1220" stroke-width="2"/><path d="M60,{y + 30} H1220" stroke-width="1"/></g>')
         anims += [{"sel": "#hd", "fx": "wipe", "dur": dur, "t": 0.3}, {"sel": "#hdr1", "fx": "wipe", "dur": 0.8, "rel": 0.3}]
+    elif style == "ink":
+        # handwritten script heading sitting on the first ruled line, double red-pen underline
+        lines = wrap(h, size + 10, 1080, 2)
+        sz = size + 10 if len(lines) == 1 else round(size * 0.85)
+        parts.append(multiline(130, 96 - (0 if len(lines) == 1 else 30), lines, sz, T["primary"], id="hd", lh=1.05, bold=True))
+        tw = min(1080, max(len(l) for l in lines) * sz * 1.1 * 0.40)
+        parts.append(f'<g id="hdul" fill="none" stroke="{T["secondary"]}" stroke-width="3" stroke-linecap="round">'
+                     f'<path d="M130,112 C{130 + tw * 0.4:.0f},108 {130 + tw * 0.7:.0f},116 {130 + tw:.0f},111"/>'
+                     f'<path d="M136,120 C{130 + tw * 0.3:.0f},124 {130 + tw * 0.6:.0f},116 {130 + tw * 0.9:.0f},120"/></g>')
+        anims += [{"sel": "#hd", "fx": "wipe", "dur": dur, "t": 0.3}, {"sel": "#hdul", "fx": "draw", "dur": 0.6, "rel": 0.2}]
+        if scene.subheading:
+            parts.append(text(132, 158, scene.subheading, 32, T["muted"], id="sub", maxw=1080))
+            anims.append({"sel": "#sub", "fx": "wipe", "dur": 1.0, "rel": 0.5})
+        return parts, anims
     elif style in ("underline", "chalk"):
         lines = wrap(h, size, 1160, 2)
         sz = size if len(lines) == 1 else round(size * 0.8)
@@ -223,8 +237,12 @@ def decor(T: dict, idx: int) -> tuple[list[str], list[dict]]:
                  f'<path d="M200,700 H1080" stroke-dasharray="6 6" stroke-width="1"/>{text(640, 694, f"FIG. {idx + 1}", 16, m, anchor="middle")}</g>')
         a.append({"sel": "#dd", "fx": "draw", "dur": 1.0, "t": 0.3})
     elif kind == "sticky":
-        p.append(f'<g id="dd" transform="translate(1150,56) rotate(6)"><rect x="-44" y="-26" width="88" height="52" fill="{T["accent"]}" opacity=".85"/>'
-                 f'{text(0, 8, f"#{idx + 1}", 26, T["ink"], anchor="middle")}</g>')
+        p.append(f'<g transform="translate(1160,62) rotate(5)"><g id="dd">'
+                 f'<rect x="-50" y="-34" width="100" height="68" fill="#000" opacity=".12" transform="translate(4,6)"/>'
+                 f'<path d="M-50,-34 H50 V20 L36,34 H-50 Z" fill="{T["accent"]}"/>'
+                 f'<path d="M50,20 L36,34 L36,20 Z" fill="#e6c94a"/>'
+                 f'<rect x="-28" y="-44" width="56" height="16" fill="#fff" opacity=".55" transform="rotate(-4)"/>'
+                 f'{text(0, 8, f"p. {idx + 1}", 28, T["ink"], anchor="middle", cls="script")}</g></g>')
         a.append({"sel": "#dd", "fx": "pop", "dur": 0.5, "t": 0.5})
     return p, a
 
@@ -829,12 +847,13 @@ def i_points(s: Scene, T, url, idx=0) -> tuple[str, list[dict]]:
             p.append(f'<g id="pt{i}">{"".join(g)}</g>')
             a.append({"sel": f"#pt{i}", "fx": "fade", "dur": 0.5, "cue": cue(it)})
     elif style == "checklist":  # handwritten to-do on the ruled lines
-        rh = 72; y0 = 251 + (470 - rh * n) / 2; y0 = 215 + 36 * round((y0 - 215) / 36)
+        rh = 72; y0 = 251 + (470 - rh * n) / 2; y0 = 165.5 + 36 * round((y0 - 165.5) / 36)  # baselines sit on the rules
         for i, it in enumerate(items):
             y = y0 + i * rh; col = palette(T)[i % 5]
             g = [f'<rect x="{lx + 4}" y="{y - 24}" width="30" height="30" rx="4" fill="{T["card"]}" stroke="{T["ink"]}" stroke-width="2.5"/>',
-                 f'<path class="tick" d="M{lx + 10},{y - 8} l8,9 l16,-20" fill="none" stroke="{T["secondary"]}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>',
-                 text(lx + 52, y, (it.label or "") + (f"  {it.value}" if it.value else ""), 34, T["ink"], maxw=490, cls="script")]
+                 f'<path class="tick" d="M{lx + 8},{y - 10} l10,12 l20,-26" fill="none" stroke="{T["secondary"]}" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>',
+                 f'<rect x="{lx + 46}" y="{y - 26}" width="{min(480, len((it.label or "") + (it.value or "")) * 22 + 24)}" height="34" fill="{T["accent"]}" opacity=".55" rx="3"/>' if i == 0 else "",
+                 text(lx + 54, y, (it.label or "") + (f"  {it.value}" if it.value else ""), 40, T["primary"], maxw=490, cls="script")]
             if it.caption:
                 g.append(text(lx + 52, y + 30, it.caption, 22, T["muted"], maxw=490))
             p.append(f'<g id="pt{i}">{"".join(g)}</g>')

@@ -53,9 +53,16 @@ function applyTheme(th) {
     add('<rect x="22" y="22" width="1236" height="676" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="2"/>');
   }
   if (T.background === "notebook") {
-    add('<rect width="1280" height="720" fill="url(#rules-notebook)"/>');
-    add('<path d="M96,0 V720" stroke="#e58a8a" stroke-width="2" opacity=".8"/>');
-    add('<g fill="#fdfcfa" stroke="#9aa5b1" stroke-width="2"><circle cx="40" cy="120" r="11"/><circle cx="40" cy="360" r="11"/><circle cx="40" cy="600" r="11"/></g>');
+    // page edge + shadow, ruled lines below a header band, red double margin, spiral rings down the left
+    add('<rect x="34" y="0" width="1246" height="720" fill="#000" opacity=".06"/>');
+    add('<rect x="30" y="0" width="1250" height="720" fill="' + T.bg + '"/>');
+    let rules = "";
+    for (let y = 171.5; y < 720; y += 36) rules += `<path d="M30,${y} H1280" stroke="#b9cbe8" stroke-width="1.4"/>`;
+    add('<g>' + rules + '</g>');
+    add('<path d="M112,0 V720" stroke="#e58a8a" stroke-width="1.6"/><path d="M118,0 V720" stroke="#e58a8a" stroke-width="1.2" opacity=".7"/>');
+    let rings = "";
+    for (let y = 48; y < 720; y += 72) rings += `<ellipse cx="46" cy="${y}" rx="9" ry="12" fill="#e9e6dc" stroke="#9aa5b1" stroke-width="1.5"/><path d="M12,${y - 14} C8,${y - 2} 30,${y + 4} 50,${y - 6}" fill="none" stroke="#7d8793" stroke-width="5" stroke-linecap="round"/><path d="M12,${y - 14} C8,${y - 2} 30,${y + 4} 50,${y - 6}" fill="none" stroke="#c9d1da" stroke-width="2" stroke-linecap="round"/>`;
+    add('<g>' + rings + '</g>');
   }
   if (T.background === "pixelgrid") add('<rect width="1280" height="720" fill="url(#grid-pixel)"/>');
   if (T.frame === "whiteboard") {
