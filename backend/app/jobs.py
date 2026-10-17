@@ -101,6 +101,8 @@ async def run(p: dict):
         _update(p, storyboard=sb.model_dump(by_alias=True), title=sb.title, progress=12,
                 message=f"Storyboard ready: {len(sb.scenes)} scenes")
 
+    T = get_theme(sb.theme)
+
     # 2. voice
     voice = inp.voice_id or os.environ.get("ELEVENLABS_DEFAULT_VOICE") or await _default_voice()
     _update(p, status="voicing", progress=14, message="Generating the voice-over…")
@@ -117,7 +119,7 @@ async def run(p: dict):
             return str(mp3), words, _probe(str(mp3))
 
     async def illustrate(i, sc):
-        if inp.visuals != "illustrated" or not sc.illustration or sc.type not in ILLUSTRATED:
+        if inp.visuals != "illustrated" or T.get("no_images") or not sc.illustration or sc.type not in ILLUSTRATED:
             return None  # data-only layouts (bars, stat, flow, compare, diagram) don't place art; skip the cost
         out = await images.generate(sb.theme, sc.illustration, pdir / f"illus_{i}.png")
         if out:
@@ -133,7 +135,6 @@ async def run(p: dict):
 
     # 3. compose
     _update(p, status="composing", progress=38, message="Laying out scenes and syncing animation…")
-    T = get_theme(sb.theme)
     spec_scenes, offsets, offset = [], [], 0.0
     for i, (sc, (mp3, words, adur)) in enumerate(zip(sb.scenes, voiced)):
         s = compose.compose_scene(sc, T, words, adur, is_last=(i == len(sb.scenes) - 1), hand=inp.hand, image_url=illus_urls[i], idx=i)

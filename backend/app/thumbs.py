@@ -28,7 +28,7 @@ async def ensure_thumbs(force: bool = False) -> None:
             return
         words = [(w, i * 0.3, i * 0.3 + 0.25) for i, w in enumerate(DEMO_SCENE.narration.split())]
         scenes = []
-        arts = await asyncio.gather(*(images.generate(n, DEMO_SCENE.illustration, OUT / f"{n}-art.png") for n in missing))
+        arts = await asyncio.gather(*(images.generate(n, DEMO_SCENE.illustration, OUT / f"{n}-art.png") if not THEMES[n].get("no_images") else asyncio.sleep(0) for n in missing))
         for n, art in zip(missing, arts):
             T = THEMES[n]
             s = compose.compose_scene(DEMO_SCENE, T, words, len(words) * 0.3, image_url=f"/data/themes/{n}-art.png" if art else None)

@@ -12,8 +12,8 @@ from .models import Item, Scene
 def _t(name, title, description, *, primary, secondary, accent, good="#2e8b57", bad="#d64545", ink="#222222",
        muted="#5b6472", soft="#e9f1fb", bg="#fdfcfa", card="#ffffff", font_head="hand", font_body="hand",
        background="plain", filter="wobble", mono=False, highlight=False, uppercase=False, hand="marker",
-       stroke_scale=1.0, dark=False, swatch=None):
-    return dict(name=name, title=title, description=description, primary=primary, secondary=secondary, accent=accent,
+       stroke_scale=1.0, dark=False, swatch=None, no_images=False):
+    return dict(no_images=no_images, name=name, title=title, description=description, primary=primary, secondary=secondary, accent=accent,
                 good=good, bad=bad, ink=ink, muted=muted, soft=soft, bg=bg, card=card, font_head=font_head,
                 font_body=font_body, background=background, filter=filter, mono=mono, highlight=highlight,
                 uppercase=uppercase, hand=hand, stroke_scale=stroke_scale, dark=dark,
@@ -23,6 +23,8 @@ def _t(name, title, description, *, primary, secondary, accent, good="#2e8b57", 
 THEMES = {t["name"]: t for t in [
     _t("hand-drawn", "Hand Drawn", "Friendly whiteboard sketch with colourful markers.",
        primary="#1f4aa8", secondary="#5aa9e6", accent="#e08a1e"),
+    _t("classic-whiteboard", "Classic Whiteboard", "The original look: marker lettering and the built-in vector drawings, no AI art.",
+       primary="#1f4aa8", secondary="#5aa9e6", accent="#e08a1e", no_images=True),
     _t("hand-vector", "Hand Vector", "Clean single-weight line icons, restrained palette.",
        primary="#1b2a41", secondary="#4a6fa5", accent="#1b2a41", good="#2f6f4e", bad="#8c2f2f", muted="#6b7280",
        soft="#f1f3f6", bg="#ffffff", filter="none", font_head="kalam", font_body="kalam"),
@@ -75,6 +77,7 @@ THEMES = {t["name"]: t for t in [
 
 # Locked art-direction prompt per theme for the image model. Subject brief is appended; "no text" is enforced globally.
 STYLES = {
+    "classic-whiteboard": "unused",
     "hand-drawn": "Hand-drawn whiteboard explainer illustration: bold black marker outlines, flat bright colour fills (blue, yellow, green, coral), slight hand-drawn wobble, small doodle accents like stars and squiggles, playful and clean.",
     "hand-vector": "Clean monoline vector icon illustration: single-weight dark navy outlines, minimal muted fills (navy, slate blue, white), geometric, lots of white space, modern infographic style.",
     "bold-marker": "Bold thick marker illustration: heavy black outlines, saturated poster colours (red, yellow, blue, green), chunky shapes, energetic, highlighter-style accents.",
@@ -109,6 +112,7 @@ for _n, _o in IMAGE_OPTS.items():
 #   items:   list | boxes | columns
 #   decor:   doodles | editorial | pixels | corners | sticky | none
 LAYOUTS = {
+    "classic-whiteboard":    dict(heading="left", art="side", items="list", decor="none"),
     "hand-drawn":            dict(heading="underline", art="side", items="list", decor="doodles", frame="whiteboard"),
     "hand-vector":           dict(heading="left", art="side-right", items="list", decor="none"),
     "bold-marker":           dict(heading="label", art="side", items="boxes", decor="doodles"),
@@ -128,7 +132,7 @@ for _n, _l in LAYOUTS.items():
 for _n in ("ocean", "forest", "sunset", "berry", "slate"):
     THEMES[_n]["layout"] = LAYOUTS["hand-drawn"]
 
-GALLERY = ["hand-drawn", "hand-vector", "bold-marker", "chalkboard", "editorial-monochrome", "voxel-arcade",
+GALLERY = ["hand-drawn", "classic-whiteboard", "hand-vector", "bold-marker", "chalkboard", "editorial-monochrome", "voxel-arcade",
            "retro-mint", "documentary-blueprint", "neon", "doodle-color-pop", "notebook", "pencil", "marker"]
 DEFAULT_THEME = "hand-drawn"
 
