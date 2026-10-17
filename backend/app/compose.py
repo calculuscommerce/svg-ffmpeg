@@ -98,8 +98,8 @@ def serialize_for_hand(anims: list[dict]) -> list[dict]:
     return anims
 
 
-def compose_scene(scene: Scene, theme: dict, words, audio_dur: float, *, is_last=False, hand=False, image_url=None) -> dict:
-    svg, anims = render_scene(scene, theme, image_url)
+def compose_scene(scene: Scene, theme: dict, words, audio_dur: float, *, is_last=False, hand=False, image_url=None, idx=0) -> dict:
+    svg, anims = render_scene(scene, theme, image_url, idx)
     words = [(w, s + LEAD, e + LEAD) for w, s, e in words]
     speech_end = LEAD + audio_dur
     timed = schedule(anims, words, speech_end)

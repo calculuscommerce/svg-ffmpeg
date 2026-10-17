@@ -136,7 +136,7 @@ async def run(p: dict):
     T = get_theme(sb.theme)
     spec_scenes, offsets, offset = [], [], 0.0
     for i, (sc, (mp3, words, adur)) in enumerate(zip(sb.scenes, voiced)):
-        s = compose.compose_scene(sc, T, words, adur, is_last=(i == len(sb.scenes) - 1), hand=inp.hand, image_url=illus_urls[i])
+        s = compose.compose_scene(sc, T, words, adur, is_last=(i == len(sb.scenes) - 1), hand=inp.hand, image_url=illus_urls[i], idx=i)
         s.update({"id": i, "audio": mp3, "thumb": str(pdir / f"thumb_{i}.png"), "hand": inp.hand and T.get("hand") != "none", "mono": bool(T.get("mono"))})
         spec_scenes.append(s)
         offsets.append((offset, words))

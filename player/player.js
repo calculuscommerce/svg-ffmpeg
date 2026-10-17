@@ -58,6 +58,12 @@ function applyTheme(th) {
     add('<g fill="#fdfcfa" stroke="#9aa5b1" stroke-width="2"><circle cx="40" cy="120" r="11"/><circle cx="40" cy="360" r="11"/><circle cx="40" cy="600" r="11"/></g>');
   }
   if (T.background === "pixelgrid") add('<rect width="1280" height="720" fill="url(#grid-pixel)"/>');
+  if (T.frame === "whiteboard") {
+    add('<rect x="10" y="10" width="1260" height="700" rx="14" fill="none" stroke="#c9ced6" stroke-width="12"/>');
+    add('<rect x="16" y="16" width="1248" height="688" rx="10" fill="none" stroke="#8d949e" stroke-width="3"/>');
+    add('<rect x="430" y="696" width="420" height="14" rx="4" fill="#b7bdc6" stroke="#8d949e" stroke-width="2"/>');
+    add('<g><rect x="470" y="688" width="70" height="10" rx="3" fill="#1f4aa8"/><rect x="560" y="688" width="70" height="10" rx="3" fill="#d1495b"/><rect x="650" y="688" width="70" height="10" rx="3" fill="#2e8b57"/></g>');
+  }
   // scene filter
   const f = T.filter === "none" ? "" : `url(#${T.filter})`;
   scene.style.filter = [f, T.mono ? "grayscale(1) contrast(1.08)" : ""].filter(Boolean).join(" ") || "none";

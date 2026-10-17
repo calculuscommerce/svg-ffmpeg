@@ -136,24 +136,97 @@ def highlight_box(x, y, s, size, T, *, anchor="start", id="hl") -> str:
     return f'<rect id="{id}" x="{x0:.0f}" y="{y - size * 0.82:.0f}" width="{w:.0f}" height="{size * 1.05:.0f}" rx="8" fill="{T["accent"]}" opacity=".45"/>'
 
 
+def L(T: dict) -> dict:
+    return T.get("layout") or {}
+
+
 def heading(scene: Scene, T: dict, *, y=100, size=64) -> tuple[list[str], list[dict]]:
     parts, anims = [], []
-    if scene.heading:
-        h = hd_text(scene.heading, T)
-        if T.get("highlight"):
-            parts.append(highlight_box(60, y, h, size, T, id="hdbox"))
-            anims.append({"sel": "#hdbox", "fx": "wipe", "dur": 0.5, "t": 0.2})
+    style = L(T).get("heading", "left")
+    if not scene.heading:
+        return parts, anims
+    h = hd_text(scene.heading, T)
+    dur = min(1.6, 0.35 + 0.045 * len(scene.heading))
+    if style == "centered-rule":
+        lines = wrap(h, size, 1000, 2)
+        sz = size if len(lines) == 1 else round(size * 0.8)
+        parts.append(f'<path id="hdr1" d="M240,52 H1040" stroke="{T["muted"]}" stroke-width="1.5"/>')
+        parts.append(multiline(640, y + 2 - (0 if len(lines) == 1 else 30), lines, sz, T["primary"], id="hd", anchor="middle", lh=1.1, bold=True))
+        parts.append(f'<path id="hdr2" d="M240,{y + 32} H1040" stroke="{T["muted"]}" stroke-width="1.5"/>')
+        anims += [{"sel": "#hdr1", "fx": "wipe", "dur": 0.6, "t": 0.2}, {"sel": "#hd", "fx": "wipe", "dur": dur, "rel": 0.2},
+                  {"sel": "#hdr2", "fx": "wipe", "dur": 0.6, "rel": 0.4}]
+        if scene.subheading:
+            parts.append(text(640, y + 72, scene.subheading, 32, T["muted"], id="sub", anchor="middle", maxw=1000, cls="script" if T.get("font_body") == "serif" else None))
+            anims.append({"sel": "#sub", "fx": "wipe", "dur": 1.0, "rel": 0.5})
+        return parts, anims
+    if style == "banner":
+        w = len(h) * size * _cur["k"] * _cur["w"] + 60
+        parts.append(f'<rect id="hdbox" x="40" y="{y - size * 0.85:.0f}" width="{w:.0f}" height="{size * 1.15:.0f}" fill="{T["primary"]}"/>')
+        parts.append(text(70, y, h, size, T["bg"], id="hd", maxw=1120, bold=True))
+        anims += [{"sel": "#hdbox", "fx": "wipe", "dur": 0.5, "t": 0.2}, {"sel": "#hd", "fx": "wipe", "dur": dur, "rel": 0.1}]
+    elif style == "label":
+        parts.append(highlight_box(60, y, h, size, T, id="hdbox"))
+        parts.append(text(60, y, h, size, T["primary"], id="hd", maxw=1160, bold=True))
+        anims += [{"sel": "#hdbox", "fx": "wipe", "dur": 0.5, "t": 0.2}, {"sel": "#hd", "fx": "wipe", "dur": dur, "rel": 0.1}]
+    elif style == "rule-double":
+        parts.append(text(60, y, h, size, T["primary"], id="hd", maxw=1160, bold=True))
+        parts.append(f'<g id="hdr1" fill="none" stroke="{T["primary"]}"><path d="M60,{y + 22} H1220" stroke-width="2"/><path d="M60,{y + 30} H1220" stroke-width="1"/></g>')
+        anims += [{"sel": "#hd", "fx": "wipe", "dur": dur, "t": 0.3}, {"sel": "#hdr1", "fx": "wipe", "dur": 0.8, "rel": 0.3}]
+    elif style in ("underline", "chalk"):
+        lines = wrap(h, size, 1160, 2)
+        sz = size if len(lines) == 1 else round(size * 0.8)
+        parts.append(multiline(60, y - (0 if len(lines) == 1 else 28), lines, sz, T["primary"], id="hd", lh=1.1, bold=True))
+        tw = min(1160, max(len(l) for l in lines) * sz * _cur["k"] * _cur["w"])
+        uy = y + 18 + (0 if len(lines) == 1 else sz * 0.9)
+        col = T["accent"] if style == "underline" else T["secondary"]
+        parts.append(f'<path id="hdul" d="M60,{uy:.0f} C{60 + tw * 0.3:.0f},{uy - 7:.0f} {60 + tw * 0.7:.0f},{uy + 9:.0f} {60 + tw:.0f},{uy - 1:.0f}" fill="none" stroke="{col}" stroke-width="{6 if style == "underline" else 4}" stroke-linecap="round"/>')
+        anims += [{"sel": "#hd", "fx": "wipe", "dur": dur, "t": 0.3}, {"sel": "#hdul", "fx": "draw", "dur": 0.5, "rel": 0.2}]
+    else:
         lines = wrap(h, size, 1160, 2)
         if len(lines) > 1:
-            size = round(size * 0.8)
-            parts.append(multiline(60, y - 28, lines, size, T["primary"], id="hd", lh=1.1, bold=True))
+            parts.append(multiline(60, y - 28, lines, round(size * 0.8), T["primary"], id="hd", lh=1.1, bold=True))
         else:
             parts.append(text(60, y, h, size, T["primary"], id="hd", maxw=1160, bold=True))
-        anims.append({"sel": "#hd", "fx": "wipe", "dur": min(1.6, 0.35 + 0.045 * len(scene.heading)), "t": 0.3})
+        anims.append({"sel": "#hd", "fx": "wipe", "dur": dur, "t": 0.3})
     if scene.subheading:
         parts.append(text(62, y + 54, scene.subheading, 36, T["muted"], id="sub", maxw=1160))
         anims.append({"sel": "#sub", "fx": "wipe", "dur": 1.0, "rel": 0.7})
     return parts, anims
+
+
+def decor(T: dict, idx: int) -> tuple[list[str], list[dict]]:
+    """Scene-level decorations that give a theme its personality. Placed in corners, never over content."""
+    kind = L(T).get("decor", "none")
+    p, a = [], []
+    if kind == "doodles":
+        c1, c2 = T["accent"], T["secondary"]
+        p.append(f'<g id="dd" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">'
+                 f'<path d="M1180,60 l6,14 15,2 -11,10 3,15 -13,-7 -13,7 3,-15 -11,-10 15,-2 Z" stroke="{c1}" fill="{c1}"/>'
+                 f'<path d="M80,660 c20,-18 30,18 50,0 s30,18 50,0" stroke="{c2}"/>'
+                 f'<path d="M1150,650 l5,10 11,2 -8,8 2,11 -10,-5 -10,5 2,-11 -8,-8 11,-2 Z" stroke="{c2}"/>'
+                 f'<circle cx="1230" cy="130" r="5" fill="{c2}" stroke="none"/><circle cx="46" cy="60" r="4" fill="{c1}" stroke="none"/></g>')
+        a.append({"sel": "#dd", "fx": "draw", "dur": 1.2, "t": 0.6})
+    elif kind == "editorial":
+        p.append(f'<g id="dd"><rect x="1096" y="36" width="124" height="34" rx="2" fill="none" stroke="{T["muted"]}" stroke-width="1.2"/>'
+                 f'{text(1158, 60, f"No. {idx + 1:02d}", 20, T["muted"], anchor="middle")}'
+                 f'<path d="M60,690 H1220" stroke="{T["muted"]}" stroke-width="1"/>'
+                 f'{text(1220, 712, f"— {idx + 1} —", 18, T["muted"], anchor="end")}</g>')
+        a.append({"sel": "#dd", "fx": "fade", "dur": 0.8, "t": 0.4})
+    elif kind == "pixels":
+        sq = "".join(f'<rect x="{x}" y="{y}" width="14" height="14" fill="{c}"/>' for x, y, c in
+                     [(1180, 40, T["primary"]), (1198, 40, T["accent"]), (1216, 40, T["secondary"]), (40, 660, T["secondary"]), (58, 660, T["accent"]), (40, 678, T["primary"])])
+        p.append(f'<g id="dd">{sq}</g>')
+        a.append({"sel": "#dd", "fx": "fade", "dur": 0.4, "t": 0.5})
+    elif kind == "corners":
+        m = T["primary"]
+        p.append(f'<g id="dd" fill="none" stroke="{m}" stroke-width="2"><path d="M40,80 V40 H80 M1200,40 H1240 V80 M40,640 V680 H80 M1240,640 V680 H1200"/>'
+                 f'<path d="M200,700 H1080" stroke-dasharray="6 6" stroke-width="1"/>{text(640, 694, f"FIG. {idx + 1}", 16, m, anchor="middle")}</g>')
+        a.append({"sel": "#dd", "fx": "draw", "dur": 1.0, "t": 0.3})
+    elif kind == "sticky":
+        p.append(f'<g id="dd" transform="translate(1150,56) rotate(6)"><rect x="-44" y="-26" width="88" height="52" fill="{T["accent"]}" opacity=".85"/>'
+                 f'{text(0, 8, f"#{idx + 1}", 26, T["ink"], anchor="middle")}</g>')
+        a.append({"sel": "#dd", "fx": "pop", "dur": 0.5, "t": 0.5})
+    return p, a
 
 
 def cue(it: Item | None):
@@ -530,58 +603,129 @@ def illus(x, y, w, h, url, *, id="illus", feather=False) -> str:
             f'</mask></defs><g mask="url(#{mid})">{img}</g></g>')
 
 
-def i_title(s: Scene, T, url) -> tuple[str, list[dict]]:
+def _art_side(T, idx) -> str:
+    art = L(T).get("art", "side")
+    if art == "side-right":
+        return "right"
+    if art == "side":
+        return "left" if idx % 2 == 0 else "right"
+    return "top"
+
+
+def i_title(s: Scene, T, url, idx=0) -> tuple[str, list[dict]]:
     p, a = [], []
+    feather = T.get("feather", False)
+    hs = L(T).get("heading", "left")
+    if hs in ("centered-rule", "banner", "chalk") or L(T).get("art") == "hero-top":
+        # centered title, picture beneath
+        lines = wrap(hd_text(s.heading, T), 76, 1100, 2)
+        p.append(multiline(640, 118 - (len(lines) - 1) * 34, lines, 76, T["primary"], id="hd", anchor="middle", lh=1.1, bold=True))
+        a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
+        uy = 118 + (len(lines) - 1) * 50 + 40
+        if hs == "centered-rule":
+            p.append(f'<path id="ul" d="M340,{uy} H940" stroke="{T["muted"]}" stroke-width="1.5"/>')
+        else:
+            p.append(f'<path id="ul" d="M400,{uy} C520,{uy - 8} 760,{uy + 10} 880,{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="7" stroke-linecap="round"/>')
+        a.append({"sel": "#ul", "fx": "draw", "dur": 0.7, "rel": 1.0})
+        if s.subheading:
+            p.append(text(640, uy + 46, s.subheading, 34, T["muted"], id="sub", anchor="middle", maxw=1000))
+            a.append({"sel": "#sub", "fx": "wipe", "dur": 1.2, "rel": 0.4})
+        p.append(illus(190, uy + 70, 900, 690 - (uy + 70), url, feather=feather))
+        a.append({"sel": "#illus", "fx": "fade" if feather else "pop", "dur": 0.9, "rel": 0.3})
+        return "".join(p), _clean(a)
+    right = _art_side(T, idx) != "left"  # title: art right by default, left for side-right themes flipped
+    tx, ax = (70, 670) if right else (640, 20)
     lines = wrap(hd_text(s.heading, T), 84, 600, 3)
     y0 = 300 - (len(lines) - 1) * 46
-    p.append(multiline(70, y0, lines, 84, T["primary"], id="hd", lh=1.1, bold=True))
+    p.append(multiline(tx, y0, lines, 84, T["primary"], id="hd", lh=1.1, bold=True))
     a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
     uy = y0 + (len(lines) - 1) * 92 + 44
-    ux2 = 70 + min(600, 40 * max(len(l) for l in lines) if lines else 400)
-    p.append(f'<path id="ul" d="M70,{uy} C170,{uy - 8} {ux2 - 120},{uy + 10} {ux2},{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="8" stroke-linecap="round"/>')
+    ux2 = tx + min(600, 40 * max(len(l) for l in lines) if lines else 400)
+    p.append(f'<path id="ul" d="M{tx},{uy} C{tx + 100},{uy - 8} {ux2 - 120},{uy + 10} {ux2},{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="8" stroke-linecap="round"/>')
     a.append({"sel": "#ul", "fx": "draw", "dur": 0.7, "rel": 1.0})
     if s.subheading:
-        p.append(multiline(70, uy + 66, wrap(s.subheading, 40, 600, 3), 40, T["ink"], id="sub"))
+        p.append(multiline(tx, uy + 66, wrap(s.subheading, 40, 600, 3), 40, T["ink"], id="sub"))
         a.append({"sel": "#sub", "fx": "wipe", "dur": 1.2, "rel": 0.5})
-    p.append(illus(670, 60, 600, 620, url, feather=T.get("feather", False)))
-    a.append({"sel": "#illus", "fx": "fade" if T.get("feather") else "pop", "dur": 0.9, "rel": 0.3})
-    if not T.get("feather"):
+    p.append(illus(ax, 60, 600, 620, url, feather=feather))
+    a.append({"sel": "#illus", "fx": "fade" if feather else "pop", "dur": 0.9, "rel": 0.3})
+    if not feather:
         a.append({"sel": "#illus", "fx": "bob", "dy": 6, "period": 3.2, "rel": 0.9})
+    d, da = decor(T, idx); p += d; a += da
     return "".join(p), _clean(a)
 
 
-def i_outro(s: Scene, T, url) -> tuple[str, list[dict]]:
+def i_outro(s: Scene, T, url, idx=0) -> tuple[str, list[dict]]:
     p, a = [], []
+    feather = T.get("feather", False)
+    right = _art_side(T, idx) != "left"
+    tx, ax = (70, 670) if right else (640, 20)
     lines = wrap(hd_text(s.heading, T), 68, 600, 3)
     y0 = 240 - (len(lines) - 1) * 38
-    p.append(multiline(70, y0, lines, 68, T["primary"], id="hd", lh=1.12, bold=True))
+    p.append(multiline(tx, y0, lines, 68, T["primary"], id="hd", lh=1.12, bold=True))
     a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
     uy = y0 + (len(lines) - 1) * 76 + 40
-    p.append(f'<path id="ul" d="M70,{uy} C170,{uy - 8} 520,{uy + 10} 640,{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="8" stroke-linecap="round"/>')
+    p.append(f'<path id="ul" d="M{tx},{uy} C{tx + 100},{uy - 8} {tx + 450},{uy + 10} {tx + 570},{uy - 2}" fill="none" stroke="{T["accent"]}" stroke-width="8" stroke-linecap="round"/>')
     a.append({"sel": "#ul", "fx": "draw", "dur": 0.7, "rel": 1.0})
     for i, it in enumerate(s.items[:3]):
         y = uy + 70 + i * 86
         col = palette(T)[i % 5]
-        g = [f'<rect x="70" y="{y - 32}" width="580" height="64" rx="32" fill="{T["card"]}" stroke="{col}" stroke-width="4"/>']
+        g = [f'<rect x="{tx}" y="{y - 32}" width="580" height="64" rx="{6 if L(T).get("items") == "boxes" else 32}" fill="{T["card"]}" stroke="{col}" stroke-width="4"/>']
         if it.icon:
-            g.append(icon(112, y, it.icon, 42, col))
-        g.append(text(150 if it.icon else 100, y + 12, it.label or "", 32, T["ink"], maxw=480))
+            g.append(icon(tx + 42, y, it.icon, 42, col))
+        g.append(text(tx + (80 if it.icon else 30), y + 12, it.label or "", 32, T["ink"], maxw=480))
         p.append(f'<g id="rp{i}">{"".join(g)}</g>')
         a.append({"sel": f"#rp{i}", "fx": "pop", "dur": 0.55, "cue": cue(it)})
-    p.append(illus(670, 60, 600, 620, url, feather=T.get("feather", False)))
-    a.insert(2, {"sel": "#illus", "fx": "fade" if T.get("feather") else "pop", "dur": 0.9, "rel": 0.3})
+    p.append(illus(ax, 60, 600, 620, url, feather=feather))
+    a.insert(2, {"sel": "#illus", "fx": "fade" if feather else "pop", "dur": 0.9, "rel": 0.3})
+    d, da = decor(T, idx); p += d; a += da
     return "".join(p), _clean(a)
 
 
-def i_points(s: Scene, T, url) -> tuple[str, list[dict]]:
-    """Illustration left, heading on top, items as a labelled list on the right (concept/cards/steps/list/callout)."""
+def i_points(s: Scene, T, url, idx=0) -> tuple[str, list[dict]]:
+    """Illustration + labelled points. Composition follows the theme layout: art left/right with a list, or a wide
+    hero picture with caption columns beneath (editorial / chalkboard / blueprint / pencil)."""
     p, a = heading(s, T)
+    feather = T.get("feather", False)
     items = [it for it in s.items if it.label or it.caption or it.value][:5]
     if s.type == "concept":
         items = [it for it in items if it is not (s.items[0] if s.items else None)] or items
-    p.append(illus(30, 150, 610, 560, url, feather=T.get("feather", False)))
-    a.append({"sel": "#illus", "fx": "fade" if T.get("feather") else "pop", "dur": 0.9, "rel": 0.4})
     n = len(items)
+    side = _art_side(T, idx)
+    style = L(T).get("items", "list")
+    numbered = s.type == "steps"
+
+    if side == "top":
+        # hero picture across the middle, captions as columns under it
+        top = 150 if not s.subheading else 180
+        ah = 350 if n else 520
+        p.append(illus(140, top, 1000, ah, url, feather=feather))
+        a.append({"sel": "#illus", "fx": "fade" if feather else "pop", "dur": 0.9, "rel": 0.4})
+        if n:
+            cw = 1120 / n
+            for i, it in enumerate(items):
+                cx = 80 + cw * (i + 0.5)
+                col = palette(T)[i % 5]
+                y = top + ah + 48
+                g = []
+                lab = hd_text(it.label or "", T) if T.get("uppercase") else (it.label or "")
+                prefix = f"{i + 1}.  " if numbered else ""
+                if it.icon and not numbered:
+                    g.append(icon(cx, y - 10, it.icon, 40, col))
+                    y += 36
+                g.append(text(cx, y, prefix + lab + (f"  {it.value}" if it.value else ""), 28, T["primary"], anchor="middle", maxw=cw - 24, bold=True))
+                if it.caption:
+                    g.append(multiline(cx, y + 30, wrap(it.caption, 22, cw - 30, 2), 22, T["muted"], anchor="middle", lh=1.2))
+                if L(T).get("decor") == "editorial":
+                    g.append(f'<path d="M{cx - cw / 2 + 24:.0f},{top + ah + 18} H{cx + cw / 2 - 24:.0f}" stroke="{T["muted"]}" stroke-width="1"/>')
+                p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+                a.append({"sel": f"#pt{i}", "fx": "fade", "dur": 0.6, "cue": cue(it)})
+        d, da = decor(T, idx); p += d; a += da
+        return "".join(p), _clean(a)
+
+    ax = 30 if side == "left" else 640
+    lx = 676 if side == "left" else 60
+    p.append(illus(ax, 150, 610, 560, url, feather=feather))
+    a.append({"sel": "#illus", "fx": "fade" if feather else "pop", "dur": 0.9, "rel": 0.4})
     if n:
         row = min(104, 470 / n)
         y0 = 215 + (470 - row * n) / 2 + 20
@@ -589,21 +733,34 @@ def i_points(s: Scene, T, url) -> tuple[str, list[dict]]:
             y = y0 + i * row
             col = palette(T)[i % 5]
             g = []
-            if s.type in ("steps",):
-                g.append(f'<circle cx="676" cy="{y - 10}" r="22" fill="{col}" stroke="{T["ink"]}" stroke-width="3"/>'
-                         + text(676, y - 1, str(i + 1), 26, T["bg"] if T.get("dark") else "#ffffff", anchor="middle", bold=True))
-            elif it.icon:
-                g.append(icon(676, y - 10, it.icon, 44, col))
-            else:
-                g.append(f'<circle cx="676" cy="{y - 10}" r="9" fill="{col}"/>')
             lab = it.label or ""
             if it.value:
                 lab = f"{lab}  {it.value}" if lab else it.value
-            g.append(text(720, y, lab, 36, T["ink"], maxw=500, bold=bool(it.value or n <= 3)))
-            if it.caption and row >= 70:
-                g.append(text(720, y + 32, it.caption, 24, T["muted"], maxw=500))
+            if style == "boxes":
+                bh = min(row - 12, 86)
+                g.append(f'<rect x="{lx}" y="{y - bh / 2 - 8}" width="560" height="{bh}" rx="{4 if L(T).get("decor") == "pixels" else 10}" fill="{T["card"]}" stroke="{col}" stroke-width="4"/>')
+                if numbered:
+                    g.append(f'<rect x="{lx}" y="{y - bh / 2 - 8}" width="54" height="{bh}" fill="{col}"/>' + text(lx + 27, y + 2, str(i + 1), 28, T["bg"] if T.get("dark") else "#fff", anchor="middle", bold=True))
+                elif it.icon:
+                    g.append(icon(lx + 32, y - 8, it.icon, 38, col))
+                tx0 = lx + 70
+                g.append(text(tx0, y - (6 if it.caption and bh > 60 else -2), lab, 30, T["ink"], maxw=560 - 90, bold=True))
+                if it.caption and bh > 60:
+                    g.append(text(tx0, y + 24, it.caption, 22, T["muted"], maxw=560 - 90))
+            else:
+                if numbered:
+                    g.append(f'<circle cx="{lx}" cy="{y - 10}" r="22" fill="{col}" stroke="{T["ink"]}" stroke-width="3"/>'
+                             + text(lx, y - 1, str(i + 1), 26, T["bg"] if T.get("dark") else "#ffffff", anchor="middle", bold=True))
+                elif it.icon:
+                    g.append(icon(lx, y - 10, it.icon, 44, col))
+                else:
+                    g.append(f'<circle cx="{lx}" cy="{y - 10}" r="9" fill="{col}"/>')
+                g.append(text(lx + 44, y, lab, 36, T["ink"], maxw=500, bold=bool(it.value or n <= 3)))
+                if it.caption and row >= 70:
+                    g.append(text(lx + 44, y + 32, it.caption, 24, T["muted"], maxw=500))
             p.append(f'<g id="pt{i}">{"".join(g)}</g>')
-            a.append({"sel": f"#pt{i}", "fx": "slide", "dx": 40, "dur": 0.6, "cue": cue(it)})
+            a.append({"sel": f"#pt{i}", "fx": "slide", "dx": 40 if side == "left" else -40, "dur": 0.6, "cue": cue(it)})
+    d, da = decor(T, idx); p += d; a += da
     return "".join(p), _clean(a)
 
 
@@ -624,12 +781,16 @@ TEMPLATES = {
 }
 
 
-def render_scene(scene: Scene, T: dict, image_url: str | None = None) -> tuple[str, list[dict]]:
+def render_scene(scene: Scene, T: dict, image_url: str | None = None, idx: int = 0) -> tuple[str, list[dict]]:
     set_font_metrics(T)
     if image_url and scene.type in ILLUSTRATED:
-        return ILLUSTRATED[scene.type](scene, T, image_url)
+        return ILLUSTRATED[scene.type](scene, T, image_url, idx)
     fn = TEMPLATES.get(scene.type, t_list)
-    return fn(scene, T)
+    svg, anims = fn(scene, T)
+    if scene.type not in ("title", "outro"):
+        d, da = decor(T, idx)
+        svg += "".join(d); anims = anims + da
+    return svg, anims
 
 
 def _clean(anims: list[dict]) -> list[dict]:

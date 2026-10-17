@@ -103,6 +103,31 @@ DEFAULT_IMAGE_OPTS = dict(background="transparent", paper=None, quality=None, sc
 for _n, _o in IMAGE_OPTS.items():
     THEMES[_n]["feather"] = bool(_o.get("feather"))
 
+# Layout personality per theme — the composition grammar, so themes don't read as recolours of one page.
+#   heading: left | underline | centered-rule | banner | rule-double | chalk | label
+#   art:     side (alternates left/right by scene) | hero-top (wide picture, caption columns beneath) | side-right
+#   items:   list | boxes | columns
+#   decor:   doodles | editorial | pixels | corners | sticky | none
+LAYOUTS = {
+    "hand-drawn":            dict(heading="underline", art="side", items="list", decor="doodles", frame="whiteboard"),
+    "hand-vector":           dict(heading="left", art="side-right", items="list", decor="none"),
+    "bold-marker":           dict(heading="label", art="side", items="boxes", decor="doodles"),
+    "chalkboard":            dict(heading="chalk", art="hero-top", items="columns", decor="none"),
+    "editorial-monochrome":  dict(heading="centered-rule", art="hero-top", items="columns", decor="editorial"),
+    "voxel-arcade":          dict(heading="banner", art="side", items="boxes", decor="pixels"),
+    "retro-mint":            dict(heading="label", art="side-right", items="boxes", decor="none"),
+    "documentary-blueprint": dict(heading="rule-double", art="hero-top", items="columns", decor="corners"),
+    "neon":                  dict(heading="centered-rule", art="side", items="list", decor="none"),
+    "doodle-color-pop":      dict(heading="underline", art="side-right", items="list", decor="doodles"),
+    "notebook":              dict(heading="left", art="side", items="list", decor="sticky"),
+    "pencil":                dict(heading="left", art="hero-top", items="columns", decor="none"),
+    "marker":                dict(heading="underline", art="side", items="list", decor="none"),
+}
+for _n, _l in LAYOUTS.items():
+    THEMES[_n]["layout"] = _l
+for _n in ("ocean", "forest", "sunset", "berry", "slate"):
+    THEMES[_n]["layout"] = LAYOUTS["hand-drawn"]
+
 GALLERY = ["hand-drawn", "hand-vector", "bold-marker", "chalkboard", "editorial-monochrome", "voxel-arcade",
            "retro-mint", "documentary-blueprint", "neon", "doodle-color-pop", "notebook", "pencil", "marker"]
 DEFAULT_THEME = "hand-drawn"
@@ -114,8 +139,10 @@ def theme(name: str | None) -> dict:
 
 def player_theme(T: dict) -> dict:
     """The subset the player needs at render time."""
-    return {k: T[k] for k in ("bg", "ink", "primary", "accent", "muted", "font_head", "font_body", "background",
-                               "filter", "mono", "hand", "stroke_scale", "dark")}
+    d = {k: T[k] for k in ("bg", "ink", "primary", "accent", "muted", "font_head", "font_body", "background",
+                           "filter", "mono", "hand", "stroke_scale", "dark")}
+    d["frame"] = (T.get("layout") or {}).get("frame")
+    return d
 
 
 # One fixed demo scene rendered in every theme for the gallery thumbnails.
