@@ -112,20 +112,21 @@ for _n, _o in IMAGE_OPTS.items():
 #   items:   list | boxes | columns
 #   decor:   doodles | editorial | pixels | corners | sticky | none
 LAYOUTS = {
-    "classic-whiteboard":    dict(heading="left", art="side", items="list", decor="none"),
-    "hand-drawn":            dict(heading="underline", art="side", items="list", decor="doodles", frame="whiteboard"),
-    "hand-vector":           dict(heading="left", art="side-right", items="list", decor="none"),
-    "bold-marker":           dict(heading="label", art="side", items="boxes", decor="doodles"),
-    "chalkboard":            dict(heading="chalk", art="hero-top", items="columns", decor="none"),
-    "editorial-monochrome":  dict(heading="centered-rule", art="hero-top", items="columns", decor="editorial"),
-    "voxel-arcade":          dict(heading="banner", art="side", items="boxes", decor="pixels"),
-    "retro-mint":            dict(heading="label", art="side-right", items="boxes", decor="none"),
-    "documentary-blueprint": dict(heading="rule-double", art="hero-top", items="columns", decor="corners"),
-    "neon":                  dict(heading="centered-rule", art="side", items="list", decor="none"),
-    "doodle-color-pop":      dict(heading="underline", art="side-right", items="list", decor="doodles"),
-    "notebook":              dict(heading="left", art="side", items="list", decor="sticky"),
-    "pencil":                dict(heading="left", art="hero-top", items="columns", decor="none"),
-    "marker":                dict(heading="underline", art="side", items="list", decor="none"),
+    #                         heading          art          items        decor
+    "classic-whiteboard":    dict(heading="left",          art="side",       items="list",      decor="none"),
+    "hand-drawn":            dict(heading="underline",     art="side",       items="list",      decor="doodles", frame="whiteboard"),
+    "hand-vector":           dict(heading="left",          art="side-right", items="grid",      decor="none"),
+    "bold-marker":           dict(heading="label",         art="side",       items="boxes",     decor="doodles"),
+    "chalkboard":            dict(heading="chalk",         art="hero-top",   items="columns",   decor="none"),
+    "editorial-monochrome":  dict(heading="centered-rule", art="hero-top",   items="columns",   decor="editorial"),
+    "voxel-arcade":          dict(heading="banner",        art="side",       items="boxes",     decor="pixels"),
+    "retro-mint":            dict(heading="label",         art="center",     items="tags",      decor="none"),
+    "documentary-blueprint": dict(heading="rule-double",   art="side",       items="table",     decor="corners"),
+    "neon":                  dict(heading="centered-rule", art="center",     items="pills",     decor="none"),
+    "doodle-color-pop":      dict(heading="underline",     art="side-right", items="bubbles",   decor="doodles"),
+    "notebook":              dict(heading="left",          art="taped-right", items="checklist", decor="sticky"),
+    "pencil":                dict(heading="left",          art="taped",      items="list",      decor="none"),
+    "marker":                dict(heading="underline",     art="center",     items="callouts",  decor="none"),
 }
 for _n, _l in LAYOUTS.items():
     THEMES[_n]["layout"] = _l

@@ -605,18 +605,27 @@ def illus(x, y, w, h, url, *, id="illus", feather=False) -> str:
 
 def _art_side(T, idx) -> str:
     art = L(T).get("art", "side")
-    if art == "side-right":
+    if art in ("side-right", "taped-right"):
         return "right"
-    if art == "side":
+    if art in ("side", "taped"):
         return "left" if idx % 2 == 0 else "right"
+    if art == "center":
+        return "center"
     return "top"
+
+
+def tape(x, y, w, h, T) -> str:
+    """Two translucent tape strips over the top corners of a picture box."""
+    c = T["accent"]
+    return (f'<rect x="{x - 10}" y="{y + 6}" width="110" height="26" fill="{c}" opacity=".55" transform="rotate(-28 {x + 45} {y + 19})"/>'
+            f'<rect x="{x + w - 100}" y="{y + 6}" width="110" height="26" fill="{c}" opacity=".55" transform="rotate(28 {x + w - 45} {y + 19})"/>')
 
 
 def i_title(s: Scene, T, url, idx=0) -> tuple[str, list[dict]]:
     p, a = [], []
     feather = T.get("feather", False)
     hs = L(T).get("heading", "left")
-    if hs in ("centered-rule", "banner", "chalk") or L(T).get("art") == "hero-top":
+    if hs in ("centered-rule", "banner", "chalk") or L(T).get("art") in ("hero-top", "center"):
         # centered title, picture beneath
         lines = wrap(hd_text(s.heading, T), 76, 1100, 2)
         p.append(multiline(640, 118 - (len(lines) - 1) * 34, lines, 76, T["primary"], id="hd", anchor="middle", lh=1.1, bold=True))
@@ -647,8 +656,11 @@ def i_title(s: Scene, T, url, idx=0) -> tuple[str, list[dict]]:
         p.append(multiline(tx, uy + 66, wrap(s.subheading, 40, 600, 3), 40, T["ink"], id="sub"))
         a.append({"sel": "#sub", "fx": "wipe", "dur": 1.2, "rel": 0.5})
     p.append(illus(ax, 60, 600, 620, url, feather=feather))
+    if L(T).get("art", "").startswith("taped"):
+        p.append(f'<g id="tape">{tape(ax + 60, 110, 480, 520, T)}</g>')
+        a.append({"sel": "#tape", "fx": "fade", "dur": 0.3, "rel": 1.0})
     a.append({"sel": "#illus", "fx": "fade" if feather else "pop", "dur": 0.9, "rel": 0.3})
-    if not feather:
+    if not feather and not L(T).get("art", "").startswith("taped"):
         a.append({"sel": "#illus", "fx": "bob", "dy": 6, "period": 3.2, "rel": 0.9})
     d, da = decor(T, idx); p += d; a += da
     return "".join(p), _clean(a)
@@ -722,11 +734,130 @@ def i_points(s: Scene, T, url, idx=0) -> tuple[str, list[dict]]:
         d, da = decor(T, idx); p += d; a += da
         return "".join(p), _clean(a)
 
+    taped = L(T).get("art", "").startswith("taped")
+    if side == "center":
+        # big picture in the middle, items arranged around / beneath it
+        p.append(illus(300, 130, 680, 330, url, feather=feather))
+        a.append({"sel": "#illus", "fx": "fade" if feather else "pop", "dur": 0.9, "rel": 0.4})
+        if style == "pills" and n:
+            pw = min(270, (1160 - 20 * (n - 1)) / n); x0 = 640 - (pw * n + 20 * (n - 1)) / 2
+            for i, it in enumerate(items):
+                x = x0 + i * (pw + 20); col = palette(T)[i % 5]
+                g = [f'<rect x="{x}" y="500" width="{pw}" height="72" rx="36" fill="none" stroke="{col}" stroke-width="4"/>']
+                if numbered:
+                    g.append(f'<circle cx="{x + 36}" cy="536" r="18" fill="{col}"/>' + text(x + 36, 545, str(i + 1), 24, T["bg"], anchor="middle", bold=True))
+                elif it.icon:
+                    g.append(icon(x + 36, 536, it.icon, 34, col))
+                g.append(text(x + 66, 545, (it.label or "") + (f" {it.value}" if it.value else ""), 28, col, maxw=pw - 80, bold=True))
+                if it.caption:
+                    g.append(text(x + pw / 2, 612, it.caption, 22, T["muted"], anchor="middle", maxw=pw))
+                p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+                a.append({"sel": f"#pt{i}", "fx": "pop", "dur": 0.5, "cue": cue(it)})
+        elif style == "tags" and n:
+            tw = min(260, (1160 - 24 * (n - 1)) / n); x0 = 640 - (tw * n + 24 * (n - 1)) / 2
+            for i, it in enumerate(items):
+                x = x0 + i * (tw + 24); col = palette(T)[i % 5]
+                g = [f'<path d="M{x},496 H{x + tw} V560 L{x + tw / 2},578 L{x},560 Z" fill="{col}" stroke="{T["ink"]}" stroke-width="3"/>',
+                     f'<rect x="{x}" y="496" width="{tw}" height="16" fill="{T["ink"]}" opacity=".18"/>',
+                     text(x + tw / 2, 544, hd_text(it.label or "", T) if T.get("uppercase") else (it.label or ""), 26, "#ffffff", anchor="middle", maxw=tw - 20, bold=True)]
+                if it.value:
+                    g.append(text(x + tw / 2, 606, it.value, 30, col, anchor="middle", maxw=tw, bold=True))
+                elif it.caption:
+                    g.append(text(x + tw / 2, 606, it.caption, 22, T["muted"], anchor="middle", maxw=tw))
+                p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+                a.append({"sel": f"#pt{i}", "fx": "slide", "dy": -30, "dur": 0.5, "cue": cue(it)})
+        elif n:  # callouts around the picture with leader lines
+            slots = [(60, 230, "L"), (60, 520, "L"), (1220, 230, "R"), (1220, 520, "R"), (640, 640, "B")][:n]
+            for i, (it, (x, y, sd)) in enumerate(zip(items, slots)):
+                col = palette(T)[i % 5]; anchor = {"L": "start", "R": "end", "B": "middle"}[sd]
+                lab = (it.label or "") + (f"  {it.value}" if it.value else "")
+                g = [text(x, y, lab, 40, T["primary"], anchor=anchor, maxw=230, bold=True)]
+                if it.caption:
+                    g.append(multiline(x, y + 36, wrap(it.caption, 24, 230, 2), 24, T["muted"], anchor=anchor))
+                est = min(230, len(lab) * 40 * _cur["k"] * _cur["w"]) + 16
+                if sd == "L":
+                    x1, x2, y2 = x + est, 330, (y - 14 if y < 400 else 440)
+                elif sd == "R":
+                    x1, x2, y2 = x - est, 950, (y - 14 if y < 400 else 440)
+                else:
+                    x1, x2, y2 = x, x, 470
+                g.append(f'<path d="M{x1:.0f},{y - 14} L{x2},{y2}" fill="none" stroke="{col}" stroke-width="3" stroke-dasharray="3 9" stroke-linecap="round"/>'
+                         f'<circle cx="{x2}" cy="{y2}" r="6" fill="{col}"/>')
+                p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+                a.append({"sel": f"#pt{i}", "fx": "fade", "dur": 0.6, "cue": cue(it)})
+        d, da = decor(T, idx); p += d; a += da
+        return "".join(p), _clean(a)
+
     ax = 30 if side == "left" else 640
-    lx = 676 if side == "left" else 60
+    lx = 676 if side == "left" else (130 if T.get("background") == "notebook" else 60)
     p.append(illus(ax, 150, 610, 560, url, feather=feather))
+    if taped:
+        p.append(f'<g id="tape">{tape(ax + 60, 190, 490, 480, T)}</g>')
     a.append({"sel": "#illus", "fx": "fade" if feather else "pop", "dur": 0.9, "rel": 0.4})
-    if n:
+    if taped:
+        a.append({"sel": "#tape", "fx": "fade", "dur": 0.3, "rel": 0.6})
+    if not n:
+        d, da = decor(T, idx); p += d; a += da
+        return "".join(p), _clean(a)
+
+    if style == "grid":  # 2x2 small cards with thin dividers (infographic)
+        cols = 2 if n > 2 else 1; rows = (n + cols - 1) // cols
+        cw, ch = (560 - 16 * (cols - 1)) / cols, min(200, (470 - 16 * (rows - 1)) / rows)
+        y0 = 215 + (470 - (ch * rows + 16 * (rows - 1))) / 2
+        for i, it in enumerate(items):
+            x = lx + (i % cols) * (cw + 16); y = y0 + (i // cols) * (ch + 16); col = palette(T)[i % 5]
+            g = [f'<rect x="{x}" y="{y}" width="{cw}" height="{ch}" rx="6" fill="{T["card"]}" stroke="{T["muted"]}" stroke-width="1.5"/>']
+            if numbered:
+                g.append(text(x + 18, y + 40, f"{i + 1:02d}", 26, col, bold=True))
+            elif it.icon:
+                g.append(icon(x + 36, y + 36, it.icon, 40, col))
+            g.append(text(x + 18, y + ch / 2 + 14, (it.label or "") + (f"  {it.value}" if it.value else ""), 30, T["ink"], maxw=cw - 36, bold=True))
+            if it.caption:
+                g.append(text(x + 18, y + ch - 20, it.caption, 20, T["muted"], maxw=cw - 36))
+            p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+            a.append({"sel": f"#pt{i}", "fx": "fade", "dur": 0.5, "cue": cue(it)})
+    elif style == "table":  # drafting title-block: rows separated by thin lines, index column
+        rh = min(90, 470 / n); y0 = 215 + (470 - rh * n) / 2
+        p.append(f'<rect x="{lx}" y="{y0}" width="560" height="{rh * n}" fill="none" stroke="{T["primary"]}" stroke-width="2"/>')
+        for i, it in enumerate(items):
+            y = y0 + i * rh; col = palette(T)[i % 5]
+            g = [f'<path d="M{lx},{y + rh} H{lx + 560} M{lx + 70},{y} V{y + rh}" stroke="{T["primary"]}" stroke-width="1.2" fill="none"/>',
+                 text(lx + 35, y + rh / 2 + 10, f"{i + 1:02d}" if numbered else "•", 26, col, anchor="middle", bold=True),
+                 text(lx + 90, y + rh / 2 - (6 if it.caption and rh > 60 else -10), hd_text(it.label or "", T) + (f"  {it.value}" if it.value else ""), 28, T["ink"], maxw=450, bold=True)]
+            if it.caption and rh > 60:
+                g.append(text(lx + 90, y + rh / 2 + 24, it.caption, 20, T["muted"], maxw=450))
+            p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+            a.append({"sel": f"#pt{i}", "fx": "fade", "dur": 0.5, "cue": cue(it)})
+    elif style == "checklist":  # handwritten to-do on the ruled lines
+        rh = 72; y0 = 251 + (470 - rh * n) / 2; y0 = 215 + 36 * round((y0 - 215) / 36)
+        for i, it in enumerate(items):
+            y = y0 + i * rh; col = palette(T)[i % 5]
+            g = [f'<rect x="{lx + 4}" y="{y - 24}" width="30" height="30" rx="4" fill="{T["card"]}" stroke="{T["ink"]}" stroke-width="2.5"/>',
+                 f'<path class="tick" d="M{lx + 10},{y - 8} l8,9 l16,-20" fill="none" stroke="{T["secondary"]}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>',
+                 text(lx + 52, y, (it.label or "") + (f"  {it.value}" if it.value else ""), 34, T["ink"], maxw=490, cls="script")]
+            if it.caption:
+                g.append(text(lx + 52, y + 30, it.caption, 22, T["muted"], maxw=490))
+            p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+            a.append({"sel": f"#pt{i}", "fx": "fade", "dur": 0.4, "cue": cue(it)})
+            a.append({"sel": f"#pt{i} .tick", "fx": "draw", "dur": 0.4, "rel": 0.3})
+    elif style == "bubbles":  # tilted speech bubbles pointing at the picture
+        bh = min(96, 470 / n - 10); y0 = 215 + (470 - (bh + 10) * n) / 2 + 10
+        for i, it in enumerate(items):
+            y = y0 + i * (bh + 10); col = palette(T)[i % 5]; rot = (-2.5, 2, -1.5, 2.5, -2)[i % 5]
+            tail = f'M{lx + 540},{y + bh / 2 - 10} l24,10 l-24,10' if side == "right" else f'M{lx + 20},{y + bh / 2 - 10} l-24,10 l24,10'
+            g = [f'<g transform="rotate({rot} {lx + 280} {y + bh / 2})"><rect x="{lx + 20}" y="{y}" width="520" height="{bh}" rx="{bh / 2}" fill="{T["card"]}" stroke="{col}" stroke-width="4"/>'
+                 f'<path d="{tail} Z" fill="{T["card"]}" stroke="{col}" stroke-width="4" stroke-linejoin="round"/>']
+            if it.icon and not numbered:
+                g.append(icon(lx + 62, y + bh / 2, it.icon, 40, col))
+            elif numbered:
+                g.append(f'<circle cx="{lx + 62}" cy="{y + bh / 2}" r="20" fill="{col}"/>' + text(lx + 62, y + bh / 2 + 9, str(i + 1), 26, "#fff", anchor="middle", bold=True))
+            g.append(text(lx + 100, y + bh / 2 + (0 if it.caption else 11), (it.label or "") + (f"  {it.value}" if it.value else ""), 30, T["ink"], maxw=420, bold=True))
+            if it.caption:
+                g.append(text(lx + 100, y + bh / 2 + 28, it.caption, 21, T["muted"], maxw=420))
+            g.append("</g>")
+            p.append(f'<g id="pt{i}">{"".join(g)}</g>')
+            a.append({"sel": f"#pt{i}", "fx": "pop", "dur": 0.5, "cue": cue(it)})
+    else:
         row = min(104, 470 / n)
         y0 = 215 + (470 - row * n) / 2 + 20
         for i, it in enumerate(items):
