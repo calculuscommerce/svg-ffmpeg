@@ -37,6 +37,7 @@ function applyTheme(th) {
   const stageEl = document.getElementById("stage");
   stageEl.style.setProperty("--font-body", FONTS[T.font_body] || FONTS.hand);
   stageEl.style.setProperty("--font-head", FONTS[T.font_head] || FONTS.hand);
+  stageEl.classList.toggle("pixel", !!T.pixel);
   // background decoration
   const decor = document.getElementById("bg-decor");
   decor.replaceChildren();
@@ -64,7 +65,7 @@ function applyTheme(th) {
     for (let y = 48; y < 720; y += 72) rings += `<ellipse cx="46" cy="${y}" rx="9" ry="12" fill="#e9e6dc" stroke="#9aa5b1" stroke-width="1.5"/><path d="M12,${y - 14} C8,${y - 2} 30,${y + 4} 50,${y - 6}" fill="none" stroke="#7d8793" stroke-width="5" stroke-linecap="round"/><path d="M12,${y - 14} C8,${y - 2} 30,${y + 4} 50,${y - 6}" fill="none" stroke="#c9d1da" stroke-width="2" stroke-linecap="round"/>`;
     add('<g>' + rings + '</g>');
   }
-  if (T.background === "pixelgrid") add('<rect width="1280" height="720" fill="url(#grid-pixel)"/>');
+  if (T.background === "pixelgrid") add('<rect width="1280" height="720" fill="url(#grid-pixel)" opacity=".5"/>');
   if (T.frame === "whiteboard") {
     add('<rect x="10" y="10" width="1260" height="700" rx="14" fill="none" stroke="#c9ced6" stroke-width="12"/>');
     add('<rect x="16" y="16" width="1248" height="688" rx="10" fill="none" stroke="#8d949e" stroke-width="3"/>');

@@ -140,6 +140,41 @@ def L(T: dict) -> dict:
     return T.get("layout") or {}
 
 
+def arcade_wrap(text_: str, size: float, maxw: float, max_lines=2) -> list[str]:
+    """Press Start 2P is a square font: one glyph ≈ 1.0 em wide."""
+    max_chars = max(4, int(maxw / (size * 1.02)))
+    words, lines, cur = text_.split(), [], ""
+    for w in words:
+        if cur and len(cur) + 1 + len(w) > max_chars:
+            lines.append(cur); cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        lines.append(cur)
+    return lines[:max_lines]
+
+
+def arcade_fit(text_: str, size: float, maxw: float, min_size: float, max_lines=2):
+    """Shrink until the text fits in max_lines."""
+    while True:
+        lines = arcade_wrap(text_, size, maxw, max_lines=99)
+        if len(lines) <= max_lines or size <= min_size:
+            return lines[:max_lines], size
+        size -= 4
+
+
+def arcade_lines(x, lines, size, *, anchor="start", id="hd", y0=100, lh=1.35) -> str:
+    """Chunky arcade headline: white first line, yellow following lines, dark outline + hard drop shadow."""
+    sz = round(size, 1)
+    out = []
+    for i, ln in enumerate(lines):
+        y = y0 + i * sz * lh
+        fill = "#ffffff" if i == 0 else "#ffd43b"
+        out.append(f'<text class="h" x="{x + 5}" y="{y + 7}" font-size="{sz}" fill="#0b1e4a" text-anchor="{anchor}">{esc(ln)}</text>')
+        out.append(f'<text class="h" x="{x}" y="{y}" font-size="{sz}" fill="{fill}" stroke="#0b1e4a" stroke-width="{max(4, sz * 0.14):.1f}" stroke-linejoin="round" style="paint-order:stroke" text-anchor="{anchor}">{esc(ln)}</text>')
+    return f'<g id="{id}">{"".join(out)}</g>'
+
+
 def heading(scene: Scene, T: dict, *, y=100, size=64) -> tuple[list[str], list[dict]]:
     parts, anims = [], []
     style = L(T).get("heading", "left")
@@ -147,6 +182,16 @@ def heading(scene: Scene, T: dict, *, y=100, size=64) -> tuple[list[str], list[d
         return parts, anims
     h = hd_text(scene.heading, T)
     dur = min(1.6, 0.35 + 0.045 * len(scene.heading))
+    if style == "arcade":
+        lines, sz = arcade_fit(h, 52, 1160, 30, max_lines=1)
+        if len(lines) > 1 or sz < 34:
+            lines, sz = arcade_fit(h, 40, 1160, 26, max_lines=2)
+        parts.append(arcade_lines(60, lines, sz, y0=y - 10 - (sz * 1.35 if len(lines) > 1 else 0)))
+        anims.append({"sel": "#hd", "fx": "wipe", "dur": dur, "t": 0.3})
+        if scene.subheading:
+            parts.append(text(62, y + 50, scene.subheading, 24, T["muted"], id="sub", maxw=1160))
+            anims.append({"sel": "#sub", "fx": "wipe", "dur": 1.0, "rel": 0.7})
+        return parts, anims
     if style == "centered-rule":
         lines = wrap(h, size, 1000, 2)
         sz = size if len(lines) == 1 else round(size * 0.8)
@@ -609,11 +654,11 @@ def illus(x, y, w, h, url, *, id="illus", feather=False) -> str:
     feather=True: the image is multiply-blended (paper whites disappear into the theme background) and its edges are
     softened with a blurred mask so an opaque paper image melts into the page."""
     img = (f'<image href="{esc(url)}" x="{x:.0f}" y="{y:.0f}" width="{w:.0f}" height="{h:.0f}" '
-           f'preserveAspectRatio="xMidYMid meet"{" style=\"mix-blend-mode:multiply;filter:contrast(1.28) saturate(0)\"" if feather else ""}/>')
+           f'preserveAspectRatio="xMidYMid meet"{" style=\"mix-blend-mode:multiply;filter:contrast(1.28) saturate(0)\"" if feather is True else " class=\"art\""}/>')
     if not feather:
         return img.replace("<image ", f'<image id="{id}" ', 1)
     mid = f"m{id}"
-    inset, blur = 58, 34
+    inset, blur = (58, 34) if feather is True else (30, 14)
     return (f'<g id="{id}"><defs>'
             f'<filter id="{mid}f" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="{blur}"/></filter>'
             f'<mask id="{mid}" maskUnits="userSpaceOnUse" x="{x - 60:.0f}" y="{y - 60:.0f}" width="{w + 120:.0f}" height="{h + 120:.0f}">'
@@ -643,6 +688,20 @@ def i_title(s: Scene, T, url, idx=0) -> tuple[str, list[dict]]:
     p, a = [], []
     feather = T.get("feather", False)
     hs = L(T).get("heading", "left")
+    if hs == "arcade":
+        # poster title: huge pixel headline stacked top-centre, character scene filling the lower half
+        lines, sz = arcade_fit(hd_text(s.heading, T), 88, 1140, 48, max_lines=2)
+        p.append(arcade_lines(640, lines, sz, anchor="middle", y0=60 + sz))
+        a.append({"sel": "#hd", "fx": "wipe", "dur": 1.4, "t": 0.3})
+        ty = 60 + sz + (len(lines) - 1) * sz * 1.35 + 50
+        if s.subheading:
+            p.append(text(640, ty, s.subheading, 26, T["muted"], id="sub", anchor="middle", maxw=1100))
+            a.append({"sel": "#sub", "fx": "wipe", "dur": 1.2, "rel": 0.5})
+            ty += 20
+        p.append(illus(190, ty + 10, 900, 700 - ty, url))
+        a.append({"sel": "#illus", "fx": "pop", "dur": 0.8, "rel": 0.3})
+        d, da = decor(T, idx); p += d; a += da
+        return "".join(p), _clean(a)
     if hs in ("centered-rule", "banner", "chalk") or L(T).get("art") in ("hero-top", "center"):
         # centered title, picture beneath
         lines = wrap(hd_text(s.heading, T), 76, 1100, 2)

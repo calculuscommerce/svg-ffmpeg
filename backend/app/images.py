@@ -6,6 +6,7 @@ import base64
 import hashlib
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 from openai import AsyncOpenAI
@@ -67,4 +68,12 @@ async def generate(theme_name: str, brief: str, dest: Path, *, quality: str | No
             return None
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(cp, dest)
+    o = opts_for(theme_name)
+    if o.get("key_bg") and shutil.which("magick"):
+        # the model only approximates a flat colour; snap everything near the corner colour to the exact page colour
+        try:
+            corner = subprocess.run(["magick", str(dest), "-format", "%[pixel:p{8,8}]", "info:"], capture_output=True, text=True, check=True).stdout.strip()
+            subprocess.run(["magick", str(dest), "-fuzz", "14%", "-fill", o["key_bg"], "-opaque", corner, str(dest)], check=True, capture_output=True)
+        except Exception as e:  # noqa: BLE001
+            print("bg keying skipped:", str(e)[:120])
     return dest

@@ -12,8 +12,8 @@ from .models import Item, Scene
 def _t(name, title, description, *, primary, secondary, accent, good="#2e8b57", bad="#d64545", ink="#222222",
        muted="#5b6472", soft="#e9f1fb", bg="#fdfcfa", card="#ffffff", font_head="hand", font_body="hand",
        background="plain", filter="wobble", mono=False, highlight=False, uppercase=False, hand="marker",
-       stroke_scale=1.0, dark=False, swatch=None, no_images=False):
-    return dict(no_images=no_images, name=name, title=title, description=description, primary=primary, secondary=secondary, accent=accent,
+       stroke_scale=1.0, dark=False, swatch=None, no_images=False, pixel=False):
+    return dict(no_images=no_images, pixel=pixel, name=name, title=title, description=description, primary=primary, secondary=secondary, accent=accent,
                 good=good, bad=bad, ink=ink, muted=muted, soft=soft, bg=bg, card=card, font_head=font_head,
                 font_body=font_body, background=background, filter=filter, mono=mono, highlight=highlight,
                 uppercase=uppercase, hand=hand, stroke_scale=stroke_scale, dark=dark,
@@ -39,10 +39,10 @@ THEMES = {t["name"]: t for t in [
        primary="#1a1a1a", secondary="#555555", accent="#8a7f72", good="#3a3a3a", bad="#1a1a1a", ink="#1a1a1a",
        muted="#6f6f6f", soft="#efece6", bg="#f7f4ee", card="#fbf9f4", font_head="serif", font_body="serif",
        filter="none", mono=True, background="paper"),
-    _t("voxel-arcade", "Voxel Arcade", "Pixel font, blocky shapes, arcade blue.",
-       primary="#ffd43b", secondary="#5aa9e6", accent="#ff8c42", good="#7ed957", bad="#ff5d5d", ink="#ffffff",
-       muted="#b9d3f0", soft="#1b3f8f", bg="#142f73", card="#1b3f8f", font_head="pixel", font_body="pixel",
-       filter="none", background="pixelgrid", uppercase=True, dark=True, hand="none"),
+    _t("voxel-arcade", "Voxel Arcade", "16-bit pixel art: chunky white and yellow headlines on cobalt blue.",
+       primary="#ffffff", secondary="#ffd43b", accent="#ff8c42", good="#7ed957", bad="#ff5d5d", ink="#ffffff",
+       muted="#cfe0ff", soft="#173f9c", bg="#1f56d6", card="#173f9c", font_head="pixel", font_body="pixel",
+       filter="none", background="pixelgrid", uppercase=True, dark=True, hand="none", pixel=True),
     _t("retro-mint", "Retro Mint", "Mint paper, label boxes and warm accents.",
        primary="#2f5d50", secondary="#e07a3f", accent="#f2c14e", good="#2f5d50", bad="#c44536", ink="#2b3a33",
        muted="#5f7369", soft="#dfeee3", bg="#e9f4e4", card="#fbfaf2", font_head="oswald", font_body="hand",
@@ -84,7 +84,7 @@ STYLES = {
     "bold-marker": "Bold thick marker illustration: heavy black outlines, saturated poster colours (red, yellow, blue, green), chunky shapes, energetic, highlighter-style accents.",
     "chalkboard": "Chalk drawing on a dark green chalkboard: white and pastel chalk strokes (cream, soft yellow, mint), slightly dusty and grainy, textured chalk shading, classroom feel.",
     "editorial-monochrome": "Fine black ink and graphite editorial illustration in the manner of a premium broadsheet newspaper feature: realistic, well-proportioned people with warm natural expressions, rendered with dense fine parallel hatching and crosshatching, crisp confident contour lines, DEEP rich blacks and strong contrast — dense dark hatching in the shadows, clothing and hair, bright paper left for highlights — so the drawing reads bold and finished, never faint or pale. Strictly neutral monochrome — black, cool greys and white, absolutely no sepia or colour tint — on plain pure white paper. Figures are three-quarter length and fade softly into the paper at the bottom like an unfinished vignette, with generous empty paper around them. No background scenery. Short realistic text on device screens or signs is fine where natural.",
-    "voxel-arcade": "16-bit pixel art sprite: chunky visible pixels, crisp edges, limited palette (cobalt blue, yellow, orange, mint, white), retro arcade game style.",
+    "voxel-arcade": "Clean 16-bit pixel art in the style of a modern indie game cutscene: a friendly cartoon character with a big expressive face, brown hair and a green hoodie, thick dark outlines, bold saturated colours (greens, oranges, yellows, warm browns), crisp visible square pixels, simple props drawn as chunky sprites. Flat, perfectly even cobalt blue background with nothing else behind the subject.",
     "retro-mint": "Mid-century retro illustration: mint green, mustard yellow, burnt orange and dark teal, flat textured shapes, slight print grain, label-box poster style from the 1950s.",
     "documentary-blueprint": "Technical blueprint drawing: thin white and pale blue line work, dashed construction lines and dimension marks, drafting style on deep blueprint blue.",
     "neon": "Neon sign illustration: glowing tube-light strokes in electric green, cyan and magenta on black, soft outer glow, minimal filled shapes.",
@@ -102,11 +102,12 @@ IMAGE_OPTS = {
     "editorial-monochrome": dict(background="opaque", paper="#ffffff", quality="high", screen_text=True, feather=True),
     "pencil": dict(background="opaque", paper="#ffffff", quality="medium", screen_text=False, feather=True),
     "notebook": dict(background="opaque", paper="#ffffff", quality="medium", screen_text=False, feather=True),
+    "voxel-arcade": dict(background="opaque", paper="#1f56d6", quality="medium", screen_text=True, feather="mask", key_bg="#1f56d6"),
 }
 DEFAULT_IMAGE_OPTS = dict(background="transparent", paper=None, quality=None, screen_text=False, feather=False)
 
 for _n, _o in IMAGE_OPTS.items():
-    THEMES[_n]["feather"] = bool(_o.get("feather"))
+    THEMES[_n]["feather"] = _o.get("feather") or False
 
 # Layout personality per theme — the composition grammar, so themes don't read as recolours of one page.
 #   heading: left | underline | centered-rule | banner | rule-double | chalk | label
@@ -121,7 +122,7 @@ LAYOUTS = {
     "bold-marker":           dict(heading="label",         art="side",       items="boxes",     decor="doodles"),
     "chalkboard":            dict(heading="chalk",         art="hero-top",   items="columns",   decor="none"),
     "editorial-monochrome":  dict(heading="centered-rule", art="hero-top",   items="columns",   decor="editorial"),
-    "voxel-arcade":          dict(heading="banner",        art="side",       items="boxes",     decor="pixels"),
+    "voxel-arcade":          dict(heading="arcade",        art="side",       items="boxes",     decor="pixels"),
     "retro-mint":            dict(heading="label",         art="center",     items="tags",      decor="none"),
     "documentary-blueprint": dict(heading="rule-double",   art="side",       items="table",     decor="corners"),
     "neon":                  dict(heading="centered-rule", art="center",     items="pills",     decor="none"),
@@ -149,6 +150,7 @@ def player_theme(T: dict) -> dict:
     d = {k: T[k] for k in ("bg", "ink", "primary", "accent", "muted", "font_head", "font_body", "background",
                            "filter", "mono", "hand", "stroke_scale", "dark")}
     d["frame"] = (T.get("layout") or {}).get("frame")
+    d["pixel"] = bool(T.get("pixel"))
     return d
 
 
