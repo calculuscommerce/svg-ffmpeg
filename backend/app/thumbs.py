@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import shutil
 from pathlib import Path
 
 from . import compose, images, ledger
@@ -10,6 +12,7 @@ from .themes import GALLERY, THEMES, demo_for, player_theme
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "data" / "themes"
+SEED = ROOT / "assets" / "themes"   # committed thumbnails, so a fresh clone shows the gallery without generating
 _lock = asyncio.Lock()
 
 
@@ -19,6 +22,12 @@ def thumb_path(name: str) -> Path:
 
 async def ensure_thumbs(force: bool = False) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    force = force or os.environ.get("THEME_THUMBS_REGENERATE") == "1"
+    if not force:
+        for n in GALLERY:
+            seed = SEED / f"{n}.png"
+            if not thumb_path(n).exists() and seed.exists():
+                shutil.copyfile(seed, thumb_path(n))
     missing = [n for n in GALLERY if force or not thumb_path(n).exists()]
     if not missing:
         return
@@ -46,3 +55,7 @@ async def ensure_thumbs(force: bool = False) -> None:
         _, err = await proc.communicate()
         if proc.returncode != 0:
             raise RuntimeError(err.decode()[-500:])
+        SEED.mkdir(parents=True, exist_ok=True)
+        for n in missing:
+            if thumb_path(n).exists():
+                shutil.copyfile(thumb_path(n), SEED / f"{n}.png")
