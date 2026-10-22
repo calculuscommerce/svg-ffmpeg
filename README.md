@@ -78,6 +78,14 @@ proxy for /api, /media, /themes, /data) and `deploy.sh` (build frontend, rsync, 
 Size: rendering needs CPU and RAM — t3.micro works with swap but is slow; t3.large / c7a.xlarge is comfortable.
 The security group needs 22 (from your IP), 80 and 443.
 
+## S3 + CloudFront
+
+`backend/app/storage.py`: when `S3_BUCKET` and `MEDIA_BASE_URL` are set, finished videos, captions, thumbnails and
+illustrations are uploaded to `files/projects/<id>/…` and the API returns CloudFront URLs; deleting a project deletes
+its objects. The frontend build is uploaded to its own bucket (`aws s3 sync frontend/dist s3://<frontend-bucket>
+--delete`) and CloudFront routes `/` → frontend bucket, `/files/*` → media bucket, `/api/*` → EC2 origin.
+Invalidate `/index.html` after a frontend deploy: `aws cloudfront create-invalidation --distribution-id <id> --paths /index.html`.
+
 ## Gotchas
 
 - Animated elements must not carry a `transform=""` attribute (CSS transform overrides it) — wrap them in a positioned `<g>`.

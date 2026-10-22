@@ -10,7 +10,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import compose, images, ledger, llm, tts
+from . import compose, images, ledger, llm, storage, tts
 from .models import CreateProject, Storyboard
 from .templates import ILLUSTRATED
 from .themes import player_theme, theme as get_theme
@@ -54,6 +54,11 @@ class Store:
     def delete(self, pid: str):
         self.projects.pop(pid, None)
         shutil.rmtree(DATA / pid, ignore_errors=True)
+        if storage.enabled():
+            try:
+                storage.delete_project_sync(pid)
+            except Exception as e:  # noqa: BLE001
+                print("s3 delete failed:", str(e)[:120])
 
 
 store = Store()
@@ -168,8 +173,9 @@ async def run(p: dict):
     spec = {"fps": 24, "scale": 1.5 if inp.hd else 1, "concurrency": 3, "lead": compose.LEAD,
             "captions": captions, "theme": player_theme(T), "scenes": spec_scenes}
     (pdir / "spec.json").write_text(json.dumps(spec))
+    thumb_url = (lambda i: storage.public_url(p["id"], f"thumb_{i}.png")) if storage.enabled() else (lambda i: f"/media/{p['id']}/thumb_{i}.png")
     p["scenes"] = [{"index": i, "type": sc.type, "heading": sc.heading, "narration": sc.narration,
-                    "duration": s["duration"], "start": offsets[i][0], "thumb_url": f"/media/{p['id']}/thumb_{i}.png"}
+                    "duration": s["duration"], "start": offsets[i][0], "thumb_url": thumb_url(i)}
                    for i, (sc, s) in enumerate(zip(sb.scenes, spec_scenes))]
     _update(p, progress=40, message=f"Rendering {int(offset)} s of video…", status="rendering", duration=round(offset, 1))
 
@@ -203,12 +209,17 @@ async def run(p: dict):
         raise RuntimeError(f"renderer failed: {err}")
     shutil.rmtree(pdir / ".render", ignore_errors=True)
     final_dur = round(_probe(str(out)), 1)
+    video_url, captions_url = f"/media/{p['id']}/video.mp4", f"/media/{p['id']}/captions.srt"
+    if storage.enabled():
+        _update(p, progress=97, message="Uploading to storage…")
+        files = [out, pdir / "captions.srt"] + sorted(pdir.glob("thumb_*.png")) + sorted(pdir.glob("illus_*.png"))
+        await asyncio.gather(*(storage.upload(f, p["id"]) for f in files if f.exists()))
+        video_url, captions_url = storage.public_url(p["id"], "video.mp4"), storage.public_url(p["id"], "captions.srt")
     ledger.record(p, "render", "frames", final_dur / 60.0, "video-minutes", ledger.cost_render(final_dur), frames=total_frames, fps=spec["fps"], scale=spec["scale"])
     credits = ledger.video_credits(inp.duration, sb.theme, rerender=bool(p.get("rerender_of")))
     ledger.record(p, "credits", "charge", credits, "credits", 0.0, theme=sb.theme, duration_target=inp.duration, rerender=bool(p.get("rerender_of")))
     p["usage"] = ledger.project_summary(p)
-    _update(p, status="done", progress=100, message="Done", video_url=f"/media/{p['id']}/video.mp4",
-            captions_url=f"/media/{p['id']}/captions.srt", duration=final_dur)
+    _update(p, status="done", progress=100, message="Done", video_url=video_url, captions_url=captions_url, duration=final_dur)
 
 
 _voice_cache: dict = {}
