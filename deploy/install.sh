@@ -11,6 +11,7 @@ sudo dnf -y install -q nginx git ImageMagick nodejs20 python3.12 tar xz \
   atk cups-libs libXcomposite libXdamage libXrandr mesa-libgbm pango alsa-lib nss libdrm libxkbcommon at-spi2-atk libXfixes libxshmfence
 sudo alternatives --install /usr/bin/node node /usr/bin/node-20 90 2>/dev/null || true
 sudo alternatives --install /usr/bin/npm npm /usr/bin/npm-20 90 2>/dev/null || true
+sudo alternatives --install /usr/bin/npx npx /usr/bin/npx-20 90 2>/dev/null || true
 
 # ffmpeg static build (not packaged on AL2023)
 if ! command -v ffmpeg >/dev/null; then
@@ -32,7 +33,7 @@ export PATH=$HOME/.local/bin:$PATH
 # python venv + deps, node deps + Chromium (after code is synced by deploy.sh; safe to re-run)
 if [ -f $APP/backend/requirements.txt ]; then
   cd $APP/backend && uv venv .venv -p 3.12 -q && uv pip install -q -p .venv/bin/python -r requirements.txt
-  cd $APP && npm ci --omit=dev --silent && npx playwright install chromium >/dev/null
+  cd $APP && npm ci --omit=dev --silent && npm exec --yes playwright -- install chromium >/dev/null
 fi
 
 # certbot in its own venv
