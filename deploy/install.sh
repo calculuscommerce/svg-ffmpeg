@@ -44,6 +44,7 @@ fi
 
 sudo cp $APP/deploy/sketchboard.service /etc/systemd/system/sketchboard.service
 sudo sed "s/__DOMAIN__/$DOMAIN/g" $APP/deploy/nginx.conf | sudo tee /etc/nginx/conf.d/sketchboard.conf >/dev/null
+sudo cp $APP/deploy/nginx-origin.conf /etc/nginx/conf.d/origin.conf
 sudo rm -f /etc/nginx/conf.d/default.conf
 sudo systemctl daemon-reload
 sudo systemctl enable --now nginx sketchboard

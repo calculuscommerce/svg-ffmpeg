@@ -66,25 +66,98 @@ standard theme, 2× for premium-art themes, 0.25× for re-renders. `GET /api/usa
 theme and day; `GET /api/usage/estimate?duration=60&theme=…` powers the pre-generation estimate in the composer;
 each project carries `usage` (per-video breakdown). The UI has a **Usage & costs** page and a cost panel per video.
 
-## Deploying (Amazon Linux 2023 EC2)
+## Deployment guide
 
-`deploy/` holds everything: `install.sh` (server bootstrap: nginx, Node 20, Python 3.12, ffmpeg static build,
-ImageMagick, Chromium deps, 4 GB swap, certbot, systemd unit), `sketchboard.service`, `nginx.conf` (static frontend +
-proxy for /api, /media, /themes, /data) and `deploy.sh` (build frontend, rsync, install, restart). From your machine:
+Production layout: **EC2** runs the API + renderer, **S3** holds the frontend build and generated media, **CloudFront**
+serves everything from one domain (`/` → frontend bucket, `/files/*` → media bucket, `/api/*`, `/themes/*`, `/media/*`,
+`/data/*` → EC2). The `deploy/` folder has every script used below.
 
-    deploy/deploy.sh ec2-user@<host> ~/.ssh/<key>.pem
-    ssh ec2-user@<host> sudo certbot --nginx -d <domain> --agree-tos -m you@example.com --redirect
+### 1. EC2 (API + renderer)
 
-Size: rendering needs CPU and RAM — t3.micro works with swap but is slow; t3.large / c7a.xlarge is comfortable.
-The security group needs 22 (from your IP), 80 and 443.
+Prerequisites: an Amazon Linux 2023 instance (x86_64; `t3.large`/`c7a.xlarge` recommended — `t3.micro` works with
+swap but renders slowly), its SSH key pair, and a security group allowing 22 (your IP), 80 and 443. Point your
+domain's A record at the instance's public IP if you want direct access during setup.
 
-## S3 + CloudFront
+```bash
+# on your machine, from the repo root
+cp backend/.env.example backend/.env       # fill in OPENAI_API_KEY and ELEVENLABS_API_KEY
+deploy/deploy.sh ec2-user@<EC2_PUBLIC_IP> ~/.ssh/<keypair>.pem
+```
+`deploy.sh` builds the frontend, rsyncs the source to `/opt/sketchboard`, copies `backend/.env` (only if the server has
+none), then runs `deploy/install.sh` on the server, which installs nginx, Node 20, Python 3.12 + uv, a static ffmpeg,
+ImageMagick, Playwright Chromium and its system deps, creates 4 GB swap, installs the `sketchboard` systemd service
+(uvicorn on 127.0.0.1:8010) and the nginx site, and starts both. Re-run the same command to redeploy.
 
-`backend/app/storage.py`: when `S3_BUCKET` and `MEDIA_BASE_URL` are set, finished videos, captions, thumbnails and
-illustrations are uploaded to `files/projects/<id>/…` and the API returns CloudFront URLs; deleting a project deletes
-its objects. The frontend build is uploaded to its own bucket (`aws s3 sync frontend/dist s3://<frontend-bucket>
---delete`) and CloudFront routes `/` → frontend bucket, `/files/*` → media bucket, `/api/*` → EC2 origin.
-Invalidate `/index.html` after a frontend deploy: `aws cloudfront create-invalidation --distribution-id <id> --paths /index.html`.
+TLS for direct access (optional if you will only use CloudFront):
+```bash
+ssh -i ~/.ssh/<keypair>.pem ec2-user@<EC2_PUBLIC_IP> \
+  'sudo certbot --nginx -d <your.domain> --non-interactive --agree-tos -m you@example.com --redirect'
+```
+A `certbot-renew.timer` handles renewals. Useful commands on the server: `sudo systemctl status sketchboard`,
+`sudo journalctl -u sketchboard -f`, `sudo nginx -t && sudo systemctl reload nginx`.
+
+### 2. S3 buckets
+
+```bash
+export AWS_DEFAULT_REGION=us-east-1
+for b in <app>-frontend <app>-media; do
+  aws s3api create-bucket --bucket $b
+  aws s3api put-public-access-block --bucket $b --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+done
+aws s3api put-bucket-cors --bucket <app>-media --cors-configuration \
+  '{"CORSRules":[{"AllowedOrigins":["*"],"AllowedMethods":["GET","HEAD"],"AllowedHeaders":["*"],"MaxAgeSeconds":86400}]}'
+```
+Both buckets stay private; CloudFront reads them through an Origin Access Control (step 3).
+
+### 3. CloudFront
+
+1. Create an OAC: `aws cloudfront create-origin-access-control --origin-access-control-config
+   Name=<app>-oac,SigningProtocol=sigv4,SigningBehavior=always,OriginAccessControlOriginType=s3`.
+2. Create the distribution with three origins — `<app>-frontend.s3.<region>.amazonaws.com` and
+   `<app>-media.s3.<region>.amazonaws.com` (both with the OAC id) and the EC2 public DNS name as a custom origin
+   (HTTP only, port 80). Behaviours: default → frontend bucket (CachingOptimized); `/files/*` → media bucket
+   (CachingOptimized); `/api/*` → EC2 with all methods, CachingDisabled + AllViewer origin-request policy;
+   `/themes/*`, `/media/*`, `/data/*` → EC2 (GET/HEAD, CachingOptimized). Custom error responses: 403 and 404 →
+   `/index.html` with code 200 (SPA routing). A ready-to-edit config is in `deploy/cloudfront-distribution.json`.
+3. Grant the distribution read access to each bucket:
+   ```bash
+   aws s3api put-bucket-policy --bucket <bucket> --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+     "Principal":{"Service":"cloudfront.amazonaws.com"},"Action":"s3:GetObject","Resource":"arn:aws:s3:::<bucket>/*",
+     "Condition":{"StringEquals":{"AWS:SourceArn":"arn:aws:cloudfront::<account-id>:distribution/<DIST_ID>"}}}]}'
+   ```
+4. On the EC2 box, nginx needs a server block that answers for the EC2 DNS name and proxies the API/media paths
+   (`deploy/install.sh` installs it as `/etc/nginx/conf.d/origin.conf`).
+
+### 4. Publish the frontend
+
+```bash
+deploy/deploy-frontend.sh <app>-frontend <DIST_ID>     # builds, syncs to S3, invalidates /index.html
+```
+
+### 5. Point the backend at S3
+
+Add to `backend/.env` on the server (then `sudo systemctl restart sketchboard`):
+```
+S3_BUCKET=<app>-media
+MEDIA_BASE_URL=https://<DIST_ID_DOMAIN>.cloudfront.net     # or https://<your.domain> once the alias is set
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...        # or attach an instance role with s3:PutObject/DeleteObject/ListBucket on the media bucket
+AWS_SECRET_ACCESS_KEY=...
+```
+Finished videos, captions, thumbnails and illustrations are then uploaded to `files/projects/<id>/…` and the API
+returns CloudFront URLs. If the upload fails the video is still served from the server's disk.
+
+### 6. Custom domain on CloudFront
+
+1. Request an ACM certificate for the domain **in us-east-1** (DNS validation) and add the validation CNAME at your DNS host.
+2. Once issued, add the domain as an alias on the distribution with that certificate
+   (`aws cloudfront update-distribution …` with `Aliases` and `ViewerCertificate`).
+3. Change the domain's DNS record to a CNAME → `<DIST_ID_DOMAIN>.cloudfront.net` and update `MEDIA_BASE_URL`.
+
+### Checklist after deploying
+`curl https://<domain>/api/health` → `{"ok":true}` · the theme gallery shows 14 thumbnails · generate a 30 s
+Classic Whiteboard video and confirm its `video_url` is a `/files/projects/...` CloudFront URL.
 
 ## Gotchas
 
