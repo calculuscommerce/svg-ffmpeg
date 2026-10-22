@@ -173,7 +173,7 @@ async def run(p: dict):
     spec = {"fps": 24, "scale": 1.5 if inp.hd else 1, "concurrency": 3, "lead": compose.LEAD,
             "captions": captions, "theme": player_theme(T), "scenes": spec_scenes}
     (pdir / "spec.json").write_text(json.dumps(spec))
-    thumb_url = (lambda i: storage.public_url(p["id"], f"thumb_{i}.png")) if storage.enabled() else (lambda i: f"/media/{p['id']}/thumb_{i}.png")
+    thumb_url = lambda i: f"/media/{p['id']}/thumb_{i}.png"  # swapped for storage URLs after a successful upload
     p["scenes"] = [{"index": i, "type": sc.type, "heading": sc.heading, "narration": sc.narration,
                     "duration": s["duration"], "start": offsets[i][0], "thumb_url": thumb_url(i)}
                    for i, (sc, s) in enumerate(zip(sb.scenes, spec_scenes))]
@@ -213,8 +213,13 @@ async def run(p: dict):
     if storage.enabled():
         _update(p, progress=97, message="Uploading to storage…")
         files = [out, pdir / "captions.srt"] + sorted(pdir.glob("thumb_*.png")) + sorted(pdir.glob("illus_*.png"))
-        await asyncio.gather(*(storage.upload(f, p["id"]) for f in files if f.exists()))
-        video_url, captions_url = storage.public_url(p["id"], "video.mp4"), storage.public_url(p["id"], "captions.srt")
+        try:
+            await asyncio.gather(*(storage.upload(f, p["id"]) for f in files if f.exists()))
+            video_url, captions_url = storage.public_url(p["id"], "video.mp4"), storage.public_url(p["id"], "captions.srt")
+            for sc in p["scenes"]:
+                sc["thumb_url"] = storage.public_url(p["id"], f"thumb_{sc['index']}.png")
+        except Exception as e:  # noqa: BLE001  — a storage problem must never lose a finished video
+            p["log"].append({"t": time.time(), "m": f"storage upload failed, serving locally: {str(e)[:160]}"})
     ledger.record(p, "render", "frames", final_dur / 60.0, "video-minutes", ledger.cost_render(final_dur), frames=total_frames, fps=spec["fps"], scale=spec["scale"])
     credits = ledger.video_credits(inp.duration, sb.theme, rerender=bool(p.get("rerender_of")))
     ledger.record(p, "credits", "charge", credits, "credits", 0.0, theme=sb.theme, duration_target=inp.duration, rerender=bool(p.get("rerender_of")))
