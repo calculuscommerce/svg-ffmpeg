@@ -66,6 +66,18 @@ standard theme, 2× for premium-art themes, 0.25× for re-renders. `GET /api/usa
 theme and day; `GET /api/usage/estimate?duration=60&theme=…` powers the pre-generation estimate in the composer;
 each project carries `usage` (per-video breakdown). The UI has a **Usage & costs** page and a cost panel per video.
 
+## Deploying (Amazon Linux 2023 EC2)
+
+`deploy/` holds everything: `install.sh` (server bootstrap: nginx, Node 20, Python 3.12, ffmpeg static build,
+ImageMagick, Chromium deps, 4 GB swap, certbot, systemd unit), `sketchboard.service`, `nginx.conf` (static frontend +
+proxy for /api, /media, /themes, /data) and `deploy.sh` (build frontend, rsync, install, restart). From your machine:
+
+    deploy/deploy.sh ec2-user@<host> ~/.ssh/<key>.pem
+    ssh ec2-user@<host> sudo certbot --nginx -d <domain> --agree-tos -m you@example.com --redirect
+
+Size: rendering needs CPU and RAM — t3.micro works with swap but is slow; t3.large / c7a.xlarge is comfortable.
+The security group needs 22 (from your IP), 80 and 443.
+
 ## Gotchas
 
 - Animated elements must not carry a `transform=""` attribute (CSS transform overrides it) — wrap them in a positioned `<g>`.

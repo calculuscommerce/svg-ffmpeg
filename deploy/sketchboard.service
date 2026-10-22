@@ -1,0 +1,18 @@
+[Unit]
+Description=Sketchboard video generator (FastAPI + renderer)
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/opt/sketchboard/backend
+EnvironmentFile=/opt/sketchboard/backend/.env
+Environment=PATH=/opt/sketchboard/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
+Environment=RENDER_CONCURRENCY=1
+ExecStart=/opt/sketchboard/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8010 --workers 1
+Restart=always
+RestartSec=3
+# rendering can be memory-hungry on small instances
+MemoryMax=85%
+
+[Install]
+WantedBy=multi-user.target
